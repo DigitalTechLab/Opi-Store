@@ -1,2 +1,2 @@
-This is an open source app store where you browse Github, Gitlab and Codeberg applications and it`s filtered that it searches only for apk stuff. 🔑
+This is an open source app store where you browse Github, Gitlab and Codeberg applications and it`s filtered that it searches only for apk stuff.
 Because of the limits for sending requests to the github and codeberg server, you can login with your account via the access token. You must give full rights to the tokens that it can edit and delete your repositorys. There's an extra code Editor for your repos to change things fastly!
