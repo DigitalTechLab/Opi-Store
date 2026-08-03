@@ -1,0 +1,68 @@
+<resources>
+    <string name="app_name">Opi Store</string>
+    <string name="nav_search">Suche</string>
+    <string name="nav_manager">APK Manager</string>
+    <string name="nav_account">Account</string>
+    <string name="nav_settings">Einstellungen</string>
+
+    <string name="search_title">🚀 Opi Store</string>
+    <string name="search_hint">Suche...</string>
+    <string name="search_loading">Suche und filtere APKs...</string>
+    <string name="search_no_results">Keine Android-Apps mit APK gefunden.</string>
+    <string name="search_loading_link">Lade Repo vom Link...</string>
+    <string name="search_no_apk">Dieses Projekt hat keine Android APKs.</string>
+    <string name="search_no_project">Kein passendes Projekt gefunden.</string>
+    <string name="search_error">Fehler aufgetreten.</string>
+
+    <string name="detail_description">Beschreibung</string>
+    <string name="detail_already_downloaded">Bereits geladen (Installieren)</string>
+    <string name="detail_download">APK Herunterladen</string>
+    <string name="detail_loading">Lade...</string>
+    <string name="detail_no_releases">Keine APK-Releases für dieses Projekt gefunden.</string>
+
+    <string name="manager_title">📦 APK Manager</string>
+    <string name="manager_subtitle">Tippe auf eine app, um sie zu verwalten.</string>
+    <string name="manager_empty">Noch keine APKs heruntergeladen.</string>
+    <string name="manager_install">Installieren</string>
+    <string name="manager_delete">APK Datei löschen</string>
+
+    <string name="account_edit_profile">%1$s Profil bearbeiten</string>
+    <string name="account_display_name">Anzeigename</string>
+    <string name="account_bio">Bio</string>
+    <string name="account_save">Speichern</string>
+    <string name="account_cancel">Abbrechen</string>
+    <string name="account_change_token">Token ändern</string>
+    <string name="account_my_repos">Deine Repositories</string>
+    <string name="account_starred">Markiert (Starred)</string>
+    <string name="account_login_title">%1$s Login</string>
+    <string name="account_token_hint">Personal Access Token</string>
+    <string name="account_edit_hint">✏️ Tippe zum Bearbeiten</string>
+
+    <string name="settings_title">⚙️ Einstellungen</string>
+    <string name="settings_theme">Design</string>
+    <string name="settings_language">Sprache</string>
+    <string name="settings_system">System</string>
+    <string name="settings_light">Hell</string>
+    <string name="settings_dark">Dunkel</string>
+
+    <string name="projects_title_user">Projekte von %1$s</string>
+    <string name="projects_apps_user">Apps von %1$s</string>
+    <string name="projects_my_title">Deine Projekte</string>
+    <string name="projects_delete_title">🗑️ Projekt löschen?</string>
+    <string name="projects_delete_msg">Möchtest du das Repository \'%1$s\' wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden!</string>
+    <string name="projects_new_title">Neues GitHub Projekt</string>
+    <string name="projects_new_name">Projektname</string>
+    <string name="projects_new_desc">Beschreibung</string>
+    <string name="projects_new_private">Privates Repository</string>
+    <string name="projects_new_create">Erstellen</string>
+
+    <string name="editor_save_success">Hochgeladen!</string>
+    <string name="editor_loading">Lade...</string>
+    <string name="editor_msg_edit">Edit via App</string>
+    <string name="editor_msg_upload">Upload via App</string>
+
+    <string name="common_back">Zurück</string>
+    <string name="common_delete">Löschen</string>
+    <string name="common_refresh">Aktualisieren</string>
+    <string name="common_ok">OK</string>
+</resources>

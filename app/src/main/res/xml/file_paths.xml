@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Erlaubt Android den Zugriff auf heruntergeladene APKs für die Installation -->
+    <external-files-path name="downloaded_apks" path="Download/" />
+</paths>

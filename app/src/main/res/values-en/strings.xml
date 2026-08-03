@@ -1,0 +1,68 @@
+<resources>
+    <string name="app_name">Opi Store</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_manager">APK Manager</string>
+    <string name="nav_account">Account</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="search_title">🚀 Opi Store</string>
+    <string name="search_hint">Search...</string>
+    <string name="search_loading">Searching and filtering APKs...</string>
+    <string name="search_no_results">No Android apps with APK found.</string>
+    <string name="search_loading_link">Loading repo from link...</string>
+    <string name="search_no_apk">This project has no Android APKs.</string>
+    <string name="search_no_project">No matching project found.</string>
+    <string name="search_error">An error occurred.</string>
+
+    <string name="detail_description">Description</string>
+    <string name="detail_already_downloaded">Already downloaded (Install)</string>
+    <string name="detail_download">Download APK</string>
+    <string name="detail_loading">Loading...</string>
+    <string name="detail_no_releases">No APK releases found for this project.</string>
+
+    <string name="manager_title">📦 APK Manager</string>
+    <string name="manager_subtitle">Tap an app to manage it.</string>
+    <string name="manager_empty">No APKs downloaded yet.</string>
+    <string name="manager_install">Install</string>
+    <string name="manager_delete">Delete APK file</string>
+
+    <string name="account_edit_profile">Edit %1$s Profile</string>
+    <string name="account_display_name">Display Name</string>
+    <string name="account_bio">Bio</string>
+    <string name="account_save">Save</string>
+    <string name="account_cancel">Cancel</string>
+    <string name="account_change_token">Change Token</string>
+    <string name="account_my_repos">Your Repositories</string>
+    <string name="account_starred">Starred</string>
+    <string name="account_login_title">%1$s Login</string>
+    <string name="account_token_hint">Personal Access Token</string>
+    <string name="account_edit_hint">✏️ Tap to edit</string>
+
+    <string name="settings_title">⚙️ Settings</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_system">System</string>
+    <string name="settings_light">Light</string>
+    <string name="settings_dark">Dark</string>
+
+    <string name="projects_title_user">Projects of %1$s</string>
+    <string name="projects_apps_user">Apps of %1$s</string>
+    <string name="projects_my_title">Your Projects</string>
+    <string name="projects_delete_title">🗑️ Delete Project?</string>
+    <string name="projects_delete_msg">Do you really want to permanently delete \'%1$s\'? This action cannot be undone!</string>
+    <string name="projects_new_title">New GitHub Project</string>
+    <string name="projects_new_name">Project Name</string>
+    <string name="projects_new_desc">Description</string>
+    <string name="projects_new_private">Private Repository</string>
+    <string name="projects_new_create">Create</string>
+
+    <string name="editor_save_success">Uploaded!</string>
+    <string name="editor_loading">Loading...</string>
+    <string name="editor_msg_edit">Edit via App</string>
+    <string name="editor_msg_upload">Upload via App</string>
+
+    <string name="common_back">Back</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_refresh">Refresh</string>
+    <string name="common_ok">OK</string>
+</resources>
