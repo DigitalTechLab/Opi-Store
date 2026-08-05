@@ -59,6 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -81,7 +82,7 @@ data class UserProfile(val name: String, val login: String, val avatarUrl: Strin
 data class SimpleRepo(val name: String, val owner: String, val description: String, val htmlUrl: String, val stars: Int, val avatarUrl: String = "")
 data class ProjectFile(val name: String, val path: String, val type: String, val sha: String, val downloadUrl: String?)
 data class DownloadInfo(val progress: String = "", val isDownloading: Boolean = false, val isDownloaded: Boolean = false)
-data class Issue(val id: String, val number: Int, val title: String, val body: String, val state: String, val user: String, val userAvatar: String, val comments: Int)
+data class Issue(val id: String, val number: Int, val title: String, val body: String, val state: String, val user: String, val userAvatar: String, val comments: Int, val nodeId: String? = null)
 data class IssueComment(val id: String, val body: String, val user: String, val userAvatar: String, val reactions: Int, val myReactionId: String? = null)
 
 private fun t(key: String, lang: String): String {
@@ -133,6 +134,9 @@ private fun t(key: String, lang: String): String {
         "language" -> if (isDe) "Sprache" else "Language"
         "select_design" -> if (isDe) "Design wählen" else "Select Design"
         "select_language" -> if (isDe) "Sprache wählen" else "Select Language"
+        "theme_system" -> if (isDe) "System" else "System"
+        "theme_light" -> if (isDe) "Hell" else "Light"
+        "theme_dark" -> if (isDe) "Dunkel" else "Dark"
         "profile_edit_title" -> if (isDe) "Profil bearbeiten" else "Edit Profile"
         "display_name" -> if (isDe) "Anzeigename" else "Display Name"
         "bio" -> if (isDe) "Bio" else "Bio"
@@ -153,8 +157,13 @@ private fun t(key: String, lang: String): String {
         "create" -> if (isDe) "Erstellen" else "Create"
         "delete_project_title" -> if (isDe) "🗑️ Projekt löschen?" else "🗑️ Delete project?"
         "delete_project_confirm" -> if (isDe) "Möchtest du das Repository wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden!" else "Do you really want to delete the repository permanently? This action cannot be undone!"
+        "delete_issue_title" -> if (isDe) "Issue löschen?" else "Delete Issue?"
+        "delete_issue_confirm" -> if (isDe) "Möchtest du dieses Issue wirklich löschen?" else "Do you really want to delete this issue?"
+        "delete_comment_title" -> if (isDe) "Kommentar löschen?" else "Delete Comment?"
+        "delete_comment_confirm" -> if (isDe) "Möchtest du diesen Kommentar wirklich löschen?" else "Do you really want to delete this comment?"
         "yes_delete" -> if (isDe) "Ja, Löschen" else "Yes, delete"
         "uploaded" -> if (isDe) "Hochgeladen!" else "Uploaded!"
+        "upload_image" -> if (isDe) "Bild hochladen" else "Upload image"
         "edit_via_app" -> if (isDe) "Edit via App" else "Edit via App"
         "upload_via_app" -> if (isDe) "Upload via App" else "Upload via App"
         "mb_loaded" -> if (isDe) "MB geladen" else "MB loaded"
@@ -239,7 +248,13 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
             githubToken = githubToken, 
             codebergToken = codebergToken, 
             onBack = { selectedAppForDetail = null }, 
-            onOwnerClick = { owner, platform -> fullRepoListPlatform = platform; fullRepoListAppsOnly = true; fullRepoListAvatarUrl = selectedAppForDetail!!.avatarUrl; isViewingOwnProfile = false; showFullRepoListForUser = owner }, 
+            onOwnerClick = { owner, platform, avatar -> 
+                fullRepoListPlatform = platform
+                fullRepoListAppsOnly = true
+                fullRepoListAvatarUrl = avatar
+                isViewingOwnProfile = false
+                showFullRepoListForUser = owner 
+            }, 
             languageSetting = languageSetting,
             activeDownloads = activeDownloads,
             globalScope = scope
@@ -309,7 +324,13 @@ fun SettingsScreen(
                     Spacer(Modifier.width(12.dp))
                     Text(t("design", languageSetting), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
-                Text(currentTheme, color = MaterialTheme.colorScheme.primary)
+                val themeLabel = when(currentTheme) {
+                    "System" -> t("theme_system", languageSetting)
+                    "Light" -> t("theme_light", languageSetting)
+                    "Dark" -> t("theme_dark", languageSetting)
+                    else -> currentTheme
+                }
+                Text(themeLabel, color = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -350,13 +371,19 @@ fun SettingsScreen(
             text = {
                 Column {
                     listOf("System", "Light", "Dark").forEach { theme ->
+                        val themeLabel = when(theme) {
+                            "System" -> t("theme_system", languageSetting)
+                            "Light" -> t("theme_light", languageSetting)
+                            "Dark" -> t("theme_dark", languageSetting)
+                            else -> theme
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { onThemeChange(theme); showThemeDialog = false }.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = currentTheme == theme, onClick = { onThemeChange(theme); showThemeDialog = false })
                             Spacer(Modifier.width(12.dp))
-                            Text(theme)
+                            Text(themeLabel)
                         }
                     }
                 }
@@ -614,7 +641,7 @@ fun AppDetailFullScreen(
     githubToken: String, 
     codebergToken: String, 
     onBack: () -> Unit, 
-    onOwnerClick: (String, String) -> Unit, 
+    onOwnerClick: (String, String, String) -> Unit, 
     languageSetting: String,
     activeDownloads: MutableMap<String, DownloadInfo>,
     globalScope: CoroutineScope
@@ -668,7 +695,7 @@ fun AppDetailFullScreen(
                         fontSize = 16.sp, 
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .clickable { onOwnerClick(app.owner, app.platform) }
+                            .clickable { onOwnerClick(app.owner, app.platform, app.avatarUrl) }
                             .padding(4.dp)
                     )
                     Text(text = " • ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -728,7 +755,16 @@ fun AppDetailFullScreen(
     }
 
     if (showIssues) {
-        IssuesScreen(app = app, githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, onDismiss = { showIssues = false })
+        IssuesScreen(
+            app = app, 
+            githubToken = githubToken, 
+            codebergToken = codebergToken, 
+            languageSetting = languageSetting, 
+            onUserClick = { user, platform, avatar -> 
+                onOwnerClick(user, platform, avatar) 
+            },
+            onDismiss = { showIssues = false }
+        )
     }
 
     if (showVersionSheet && releases != null) {
@@ -1255,7 +1291,7 @@ private suspend fun repairApk(context: Context, file: File, platform: String, ow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String, languageSetting: String, onDismiss: () -> Unit) {
+fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String, languageSetting: String, onUserClick: (String, String, String) -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var issues by remember { mutableStateOf<List<Issue>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -1266,7 +1302,11 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
 
     val token = if (app.platform == "GitHub") githubToken else codebergToken
 
-    fun refresh() {
+    fun refresh(newIssue: Issue? = null) {
+        if (newIssue != null) {
+            if (filterOpen) issues = listOf(newIssue) + issues
+            return
+        }
         isLoading = true
         scope.launch {
             issues = fetchIssues(token, app.owner, app.name, app.platform, if (filterOpen) "open" else "closed")
@@ -1327,7 +1367,16 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(issue.title, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                        Text("#${issue.number} by ${issue.user}", fontSize = 11.sp, color = Color.Gray)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("#${issue.number} by ", fontSize = 11.sp, color = Color.Gray)
+                                            Text(
+                                                text = issue.user,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.clickable { onUserClick(issue.user, app.platform, issue.userAvatar); onDismiss() }
+                                            )
+                                        }
                                     }
                                     if (issue.comments > 0) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1345,18 +1394,56 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
         }
 
         if (selectedIssue != null) {
-            IssueDetailScreen(app = app, issue = selectedIssue!!, token = token, languageSetting = languageSetting, onBack = { selectedIssue = null; refresh() })
+            IssueDetailScreen(app = app, issue = selectedIssue!!, token = token, languageSetting = languageSetting, onUserClick = { u, p, a -> onUserClick(u, p, a); onDismiss() }, onBack = { selectedIssue = null; refresh() })
         }
 
         if (showCreateIssue) {
-            CreateIssueDialog(app = app, token = token, languageSetting = languageSetting, onDismiss = { showCreateIssue = false; refresh() })
+            CreateIssueDialog(app = app, token = token, languageSetting = languageSetting, onDismiss = { newIssue -> 
+                showCreateIssue = false
+                if (newIssue != null) refresh(newIssue) else refresh()
+            })
+        }
+    }
+}
+
+@Composable
+fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
+    val imageRegex = "!\\[.*?]\\((.*?)\\)".toRegex()
+    val parts = mutableListOf<Pair<String, String?>>()
+    var lastIndex = 0
+    imageRegex.findAll(text).forEach { match ->
+        if (match.range.first > lastIndex) {
+            parts.add(text.substring(lastIndex, match.range.first) to null)
+        }
+        parts.add("" to match.groupValues[1])
+        lastIndex = match.range.last + 1
+    }
+    if (lastIndex < text.length) {
+        parts.add(text.substring(lastIndex) to null)
+    }
+
+    Column(modifier = modifier) {
+        parts.forEach { (txt, url) ->
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Fit
+                )
+            } else if (txt.isNotBlank()) {
+                Text(txt, fontSize = 14.sp)
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageSetting: String, onBack: () -> Unit) {
+fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageSetting: String, onUserClick: (String, String, String) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var comments by remember { mutableStateOf<List<IssueComment>>(emptyList()) }
@@ -1364,8 +1451,14 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
     var commentText by remember { mutableStateOf("") }
     val myProfile = remember { mutableStateOf<UserProfile?>(null) }
     
+    var uploadingImage by remember { mutableStateOf(false) }
+    
+    var showDeleteIssueConfirm by remember { mutableStateOf(false) }
+    var commentToDelete by remember { mutableStateOf<IssueComment?>(null) }
+
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
+            uploadingImage = true
             scope.launch {
                 val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
                 if (bytes != null) {
@@ -1379,6 +1472,7 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
                         commentText += "\n![]($rawUrl)\n"
                     }
                 }
+                uploadingImage = false
             }
         }
     }
@@ -1389,18 +1483,74 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
         isLoading = false
     }
 
+    if (showDeleteIssueConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteIssueConfirm = false },
+            title = { Text(t("delete_issue_title", languageSetting)) },
+            text = { Text(t("delete_issue_confirm", languageSetting)) },
+            confirmButton = { 
+                Button(onClick = { 
+                    scope.launch { 
+                        if (deleteIssue(token, app.owner, app.name, app.platform, issue)) onBack() 
+                        showDeleteIssueConfirm = false
+                    } 
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) } 
+            },
+            dismissButton = { TextButton(onClick = { showDeleteIssueConfirm = false }) { Text(t("cancel", languageSetting)) } }
+        )
+    }
+
+    if (commentToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { commentToDelete = null },
+            title = { Text(t("delete_comment_title", languageSetting)) },
+            text = { Text(t("delete_comment_confirm", languageSetting)) },
+            confirmButton = { 
+                Button(onClick = { 
+                    scope.launch { 
+                        if (deleteComment(token, app.owner, app.name, app.platform, commentToDelete!!.id)) {
+                            comments = fetchIssueComments(token, app.owner, app.name, app.platform, issue.number, myProfile.value?.login)
+                        }
+                        commentToDelete = null
+                    } 
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) } 
+            },
+            dismissButton = { TextButton(onClick = { commentToDelete = null }) { Text(t("cancel", languageSetting)) } }
+        )
+    }
+
     Dialog(onDismissRequest = onBack, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
-            topBar = { TopAppBar(title = { Text("#${issue.number}") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }) },
+            topBar = { 
+                TopAppBar(
+                    title = { Text("#${issue.number}") }, 
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
+                    actions = {
+                        if (issue.user == myProfile.value?.login) {
+                            IconButton(onClick = { showDeleteIssueConfirm = true }) { Icon(Icons.Default.Delete, null, tint = Color.Red) }
+                        }
+                    }
+                ) 
+            },
             bottomBar = {
                 Surface(tonalElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
-                    Column {
-                        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { photoPicker.launch("image/*") }) { Icon(Icons.Default.AddPhotoAlternate, null, tint = Color.Gray) }
+                    Column(Modifier.padding(8.dp)) {
+                        if (uploadingImage) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
                         }
-                        Row(Modifier.padding(bottom = 8.dp, start = 8.dp, end = 8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        // Simple preview logic: look for images in commentText
+                        val imageLinks = "!\\[.*?]\\((.*?)\\)".toRegex().findAll(commentText).map { it.groupValues[1] }.toList()
+                        if (imageLinks.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                                items(imageLinks) { url ->
+                                    AsyncImage(model = url, contentDescription = null, modifier = Modifier.size(60.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
+                                }
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { photoPicker.launch("image/*") }) { Icon(Icons.Default.AddPhotoAlternate, null, tint = MaterialTheme.colorScheme.primary) }
                             OutlinedTextField(value = commentText, onValueChange = { commentText = it }, placeholder = { Text(t("write_comment", languageSetting)) }, modifier = Modifier.weight(1f), maxLines = 5)
-                            IconButton(onClick = { scope.launch { if (commentText.isNotBlank() && postComment(token, app.owner, app.name, app.platform, issue.number, commentText)) { commentText = ""; comments = fetchIssueComments(token, app.owner, app.name, app.platform, issue.number, myProfile.value?.login) } } }, enabled = commentText.isNotBlank()) { Icon(Icons.Default.Send, null, tint = if(commentText.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray) }
+                            IconButton(onClick = { scope.launch { if (commentText.isNotBlank() && postComment(token, app.owner, app.name, app.platform, issue.number, commentText)) { commentText = ""; comments = fetchIssueComments(token, app.owner, app.name, app.platform, issue.number, myProfile.value?.login) } } }, enabled = commentText.isNotBlank() && !uploadingImage) { Icon(Icons.Default.Send, null, tint = if(commentText.isNotBlank() && !uploadingImage) MaterialTheme.colorScheme.primary else Color.Gray) }
                         }
                     }
                 }
@@ -1411,12 +1561,25 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
                     Card(modifier = Modifier.fillMaxWidth().padding(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                AsyncImage(model = issue.userAvatar, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape))
+                                AsyncImage(
+                                    model = issue.userAvatar, 
+                                    contentDescription = null, 
+                                    modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onUserClick(issue.user, app.platform, issue.userAvatar) }
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Column { Text(issue.user, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text(if (issue.state == "open") t("open", languageSetting) else t("closed", languageSetting), color = if (issue.state == "open") Color(0xFF4CAF50) else Color(0xFFE57373), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                                Column { 
+                                    Text(
+                                        text = issue.user, 
+                                        fontWeight = FontWeight.Bold, 
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.clickable { onUserClick(issue.user, app.platform, issue.userAvatar) }
+                                    )
+                                    Text(if (issue.state == "open") t("open", languageSetting) else t("closed", languageSetting), color = if (issue.state == "open") Color(0xFF4CAF50) else Color(0xFFE57373), fontSize = 11.sp, fontWeight = FontWeight.Bold) 
+                                }
                             }
                             Spacer(modifier = Modifier.height(12.dp)); Text(issue.title, fontSize = 19.sp, fontWeight = FontWeight.Black)
-                            Spacer(modifier = Modifier.height(8.dp)); Text(issue.body, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MarkdownBody(issue.body)
                         }
                     }
                     Text(t("comments", languageSetting), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 16.sp)
@@ -1425,16 +1588,25 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
                 items(comments) { comment ->
                     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
                         Row(Modifier.padding(8.dp)) {
-                            AsyncImage(model = comment.userAvatar, contentDescription = null, modifier = Modifier.size(32.dp).clip(CircleShape))
+                            AsyncImage(
+                                model = comment.userAvatar, 
+                                contentDescription = null, 
+                                modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) }
+                            )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) { 
-                                    Text(comment.user, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = comment.user, 
+                                        fontWeight = FontWeight.Bold, 
+                                        fontSize = 13.sp, 
+                                        modifier = Modifier.weight(1f).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) }
+                                    )
                                     if (comment.user == myProfile.value?.login) {
-                                        IconButton(onClick = { scope.launch { if (deleteComment(token, app.owner, app.name, app.platform, comment.id)) comments = fetchIssueComments(token, app.owner, app.name, app.platform, issue.number, myProfile.value?.login) } }, modifier = Modifier.size(20.dp)) { Icon(Icons.Default.Delete, null, tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)) }
+                                        IconButton(onClick = { commentToDelete = comment }, modifier = Modifier.size(20.dp)) { Icon(Icons.Default.Delete, null, tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)) }
                                     }
                                 }
-                                Text(comment.body, fontSize = 14.sp)
+                                MarkdownBody(comment.body)
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                                     val isLiked = comment.myReactionId != null
                                     Row(
@@ -1472,14 +1644,16 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
 }
 
 @Composable
-fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String, onDismiss: () -> Unit) {
+fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String, onDismiss: (Issue?) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
-    
+    var uploadingImage by remember { mutableStateOf(false) }
+
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
+            uploadingImage = true
             scope.launch {
                 val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
                 if (bytes != null) {
@@ -1493,26 +1667,42 @@ fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String
                         body += "\n![]($rawUrl)\n"
                     }
                 }
+                uploadingImage = false
             }
         }
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { onDismiss(null) },
         title = { Text(t("new_issue", languageSetting)) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(t("title", languageSetting)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { photoPicker.launch("image/*") }) { Icon(Icons.Default.AddPhotoAlternate, null, tint = Color.Gray) }
-                    Text(t("body", languageSetting), style = MaterialTheme.typography.bodySmall)
-                }
+                
                 OutlinedTextField(value = body, onValueChange = { body = it }, label = { Text(t("body", languageSetting)) }, modifier = Modifier.fillMaxWidth(), minLines = 4)
+                Spacer(Modifier.height(12.dp))
+
+                if (uploadingImage) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                }
+                val imageLinks = "!\\[.*?]\\((.*?)\\)".toRegex().findAll(body).map { it.groupValues[1] }.toList()
+                if (imageLinks.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                        items(imageLinks) { url ->
+                            AsyncImage(model = url, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { photoPicker.launch("image/*") }) { Icon(Icons.Default.AddPhotoAlternate, null, tint = MaterialTheme.colorScheme.primary) }
+                    Text(t("upload_image", languageSetting), style = MaterialTheme.typography.labelMedium)
+                }
             }
         },
-        confirmButton = { Button(onClick = { scope.launch { if (createIssue(token, app.owner, app.name, app.platform, title, body)) onDismiss() } }, enabled = title.isNotBlank()) { Text(t("post", languageSetting)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(t("cancel", languageSetting)) } }
+        confirmButton = { Button(onClick = { scope.launch { val newIssue = createIssue(token, app.owner, app.name, app.platform, title, body); if (newIssue != null) onDismiss(newIssue) } }, enabled = title.isNotBlank() && !uploadingImage) { Text(t("post", languageSetting)) } },
+        dismissButton = { TextButton(onClick = { onDismiss(null) }) { Text(t("cancel", languageSetting)) } }
     )
 }
 
@@ -1526,7 +1716,7 @@ private suspend fun fetchIssues(token: String, owner: String, repo: String, plat
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); if (obj.has("pull_request")) continue
                 val user = obj.getJSONObject("user")
-                list.add(Issue(obj.getString("id"), obj.getInt("number"), obj.getString("title"), obj.optString("body", ""), obj.getString("state"), user.getString("login"), user.getString("avatar_url"), obj.optInt("comments", 0)))
+                list.add(Issue(obj.getString("id"), obj.getInt("number"), obj.getString("title"), obj.optString("body", ""), obj.getString("state"), user.getString("login"), user.getString("avatar_url"), obj.optInt("comments", 0), obj.optString("node_id")))
             }
         }
     } catch (e: Exception) {}
@@ -1584,12 +1774,37 @@ private suspend fun postComment(token: String, owner: String, repo: String, plat
     } catch (e: Exception) { false }
 }
 
-private suspend fun createIssue(token: String, owner: String, repo: String, platform: String, title: String, body: String): Boolean = withContext(Dispatchers.IO) {
+private suspend fun createIssue(token: String, owner: String, repo: String, platform: String, title: String, body: String): Issue? = withContext(Dispatchers.IO) {
     try {
         val auth = if (platform == "GitHub") "Bearer $token" else "token $token"
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/issues" else "https://codeberg.org/api/v1/repos/$owner/$repo/issues"
         val json = JSONObject().apply { put("title", title); put("body", body) }.toString().toRequestBody("application/json".toMediaType())
-        httpClient.newCall(Request.Builder().url(url).post(json).addHeader("Authorization", auth).build()).execute().use { it.isSuccessful }
+        httpClient.newCall(Request.Builder().url(url).post(json).addHeader("Authorization", auth).addHeader("User-Agent", "OpiStore").build()).execute().use { resp ->
+            val bodyStr = resp.body?.string() ?: ""
+            if (resp.isSuccessful && bodyStr.isNotBlank()) {
+                val obj = JSONObject(bodyStr)
+                val user = obj.getJSONObject("user")
+                Issue(obj.getString("id"), obj.getInt("number"), obj.getString("title"), obj.optString("body", ""), obj.getString("state"), user.getString("login"), user.getString("avatar_url"), 0, obj.optString("node_id"))
+            } else null
+        }
+    } catch (e: Exception) { null }
+}
+
+private suspend fun deleteIssue(token: String, owner: String, repo: String, platform: String, issue: Issue): Boolean = withContext(Dispatchers.IO) {
+    try {
+        if (platform == "GitHub" && issue.nodeId != null) {
+            val query = "mutation { deleteIssue(input: {issueId: \"${issue.nodeId}\"}) { clientMutationId } }"
+            val json = JSONObject().apply { put("query", query) }.toString().toRequestBody("application/json".toMediaType())
+            httpClient.newCall(Request.Builder().url("https://api.github.com/graphql").post(json).addHeader("Authorization", "Bearer $token").addHeader("User-Agent", "OpiStore").build()).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext false
+                val body = resp.body?.string() ?: ""
+                !body.contains("\"errors\":")
+            }
+        } else {
+            val auth = if (platform == "GitHub") "Bearer $token" else "token $token"
+            val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/issues/${issue.number}" else "https://codeberg.org/api/v1/repos/$owner/$repo/issues/${issue.number}"
+            httpClient.newCall(Request.Builder().url(url).delete().addHeader("Authorization", auth).addHeader("User-Agent", "OpiStore").build()).execute().use { it.isSuccessful }
+        }
     } catch (e: Exception) { false }
 }
 
