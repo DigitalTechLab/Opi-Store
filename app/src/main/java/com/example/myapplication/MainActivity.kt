@@ -2,6 +2,8 @@ package com.example.myapplication
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Environment
 import android.util.Base64
@@ -14,9 +16,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -151,6 +150,9 @@ private fun t(key: String, lang: String): String {
         "search_apps_hint" -> if (isDe) "Suche Apps..." else "Search apps..."
         "no_apps" -> if (isDe) "Keine Apps." else "No apps."
         "delete" -> if (isDe) "Löschen" else "Delete"
+        "rename" -> if (isDe) "Umbenennen" else "Rename"
+        "rename_project_title" -> if (isDe) "Projekt umbenennen" else "Rename Project"
+        "new_name" -> if (isDe) "Neuer Name" else "New Name"
         "new_github_project" -> if (isDe) "Neues GitHub Projekt" else "New GitHub Project"
         "project_name" -> if (isDe) "Projektname" else "Project Name"
         "private_repository" -> if (isDe) "Privates Repository" else "Private repository"
@@ -196,10 +198,6 @@ private fun t(key: String, lang: String): String {
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.statusBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         val sharedPrefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
         setContent {
             val themeSetting = remember { mutableStateOf(sharedPrefs.getString("THEME_SETTING", "System") ?: "System") }
@@ -768,21 +766,7 @@ fun AppDetailFullScreen(
     }
 
     if (showVersionSheet && releases != null) {
-        val window = (context as? android.app.Activity)?.window
-        SideEffect {
-            if (window != null) {
-                val controller = WindowInsetsControllerCompat(window, window.decorView)
-                controller.hide(WindowInsetsCompat.Type.statusBars())
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        }
         ModalBottomSheet(onDismissRequest = { showVersionSheet = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 12.dp, dragHandle = { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) } }) {
-            SideEffect {
-                if (window != null) {
-                    val controller = WindowInsetsControllerCompat(window, window.decorView)
-                    controller.hide(WindowInsetsCompat.Type.statusBars())
-                }
-            }
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)); Spacer(Modifier.width(12.dp)); Text(t("select_version", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.Black) }
                 LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
@@ -835,10 +819,17 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
             }
         }
         val avatarUrl = when (platform) { "GitHub" -> "https://github.com/$owner.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
+        val apkIcon = remember(file) { getApkIcon(context, file) }
         
         AlertDialog(onDismissRequest = { if (!isRepairingLocal) selectedFileForDialog = null }, confirmButton = {}, title = null, text = {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (avatarUrl != null) AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp))) else Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
+                if (apkIcon != null) {
+                    AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
+                } else if (avatarUrl != null) {
+                    AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
+                } else {
+                    Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
+                }
                 Spacer(modifier = Modifier.height(16.dp)); Text(appName.ifBlank { file.name }, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
                 if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp)) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 
@@ -892,8 +883,17 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
             val isDownloading = activeDownloads[fileName]?.isDownloading == true
             val isValid = if (isDownloading) true else isApkValid(context, file)
             val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
+            val apkIcon = remember(file) { if (isValid && !isDownloading) getApkIcon(context, file) else null }
             Card(modifier = Modifier.fillMaxWidth().clickable { selectedFileForDialog = file }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) { if (avatarUrl != null) AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) else Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray) }
+                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) { 
+                    if (apkIcon != null) {
+                        AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else if (avatarUrl != null) {
+                        AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else {
+                        Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                    }
+                }
                 Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) { 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(parts.getOrNull(2) ?: file.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -915,6 +915,7 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
     var repos by remember { mutableStateOf<List<SimpleRepo>>(emptyList()) }; var isLoading by remember { mutableStateOf(true) }
     var currentAvatarUrl by remember { mutableStateOf(ownerAvatarUrl) }; var statusText by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }; var repoToDelete by remember { mutableStateOf<SimpleRepo?>(null) }
+    var repoToRename by remember { mutableStateOf<SimpleRepo?>(null) }; var renameRepoNameInput by remember { mutableStateOf("") }
     var newRepoName by remember { mutableStateOf("") }; var newRepoDesc by remember { mutableStateOf("") }; var isPrivate by remember { mutableStateOf(false) }
     fun refresh() { scope.launch {
         isLoading = true; statusText = if (appsOnly) t("search_apps_hint", languageSetting) else ""
@@ -932,14 +933,36 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
         else if (repos.isEmpty() && statusText.isNotEmpty()) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text(statusText, color = Color.Gray) }
         else LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) { items(repos, key = { it.htmlUrl }) { repo ->
             if (isOwnProfile) {
-                val state = rememberSwipeToDismissBoxState(confirmValueChange = { if (it == SwipeToDismissBoxValue.EndToStart) { repoToDelete = repo; true } else false })
-                LaunchedEffect(repoToDelete) { if (repoToDelete == null && state.currentValue != SwipeToDismissBoxValue.Settled) state.snapTo(SwipeToDismissBoxValue.Settled) }
-                SwipeToDismissBox(state = state, enableDismissFromStartToEnd = false, backgroundContent = { Box(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(if (state.dismissDirection == SwipeToDismissBoxValue.EndToStart) Color(0xFFEF5350) else Color.Transparent), contentAlignment = Alignment.CenterEnd) { Row(modifier = Modifier.padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) { Text(t("delete", languageSetting), color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); Icon(Icons.Default.Delete, null, tint = Color.White) } } }) { RepoCard(repo, languageSetting = languageSetting) { onRepoSelected(repo) } }
+                val state = rememberSwipeToDismissBoxState(confirmValueChange = { 
+                    if (it == SwipeToDismissBoxValue.EndToStart) { repoToDelete = repo; false } 
+                    else if (it == SwipeToDismissBoxValue.StartToEnd) { repoToRename = repo; renameRepoNameInput = repo.name; false }
+                    else false 
+                })
+                SwipeToDismissBox(state = state, backgroundContent = { 
+                    val direction = state.dismissDirection
+                    val color = when (direction) {
+                        SwipeToDismissBoxValue.EndToStart -> Color(0xFFEF5350)
+                        SwipeToDismissBoxValue.StartToEnd -> Color(0xFF4CAF50)
+                        else -> Color.Transparent
+                    }
+                    Box(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(color)) { 
+                        if (direction == SwipeToDismissBoxValue.EndToStart) {
+                            Row(modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) { 
+                                Text(t("delete", languageSetting), color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); Icon(Icons.Default.Delete, null, tint = Color.White) 
+                            } 
+                        } else if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                            Row(modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) { 
+                                Icon(Icons.Default.Edit, null, tint = Color.White); Spacer(Modifier.width(12.dp)); Text(t("rename", languageSetting), color = Color.White, fontWeight = FontWeight.Bold) 
+                            }
+                        }
+                    } 
+                }) { RepoCard(repo, languageSetting = languageSetting) { onRepoSelected(repo) } }
             } else RepoCard(repo, languageSetting = languageSetting) { onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platform, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = currentAvatarUrl)) }
             Spacer(Modifier.height(8.dp))
         } }
         if (showCreateDialog) AlertDialog(onDismissRequest = { showCreateDialog = false }, title = { Text(t("new_github_project", languageSetting)) }, text = { Column { OutlinedTextField(value = newRepoName, onValueChange = { newRepoName = it }, label = { Text(t("project_name", languageSetting)) }); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(value = newRepoDesc, onValueChange = { newRepoDesc = it }, label = { Text(t("description", languageSetting)) }); Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = isPrivate, onCheckedChange = { isPrivate = it }); Text(t("private_repository", languageSetting)) } } }, confirmButton = { Button(onClick = { scope.launch { if (createGitHubRepo(token, newRepoName, newRepoDesc, isPrivate)) { showCreateDialog = false; refresh() } } }) { Text(t("create", languageSetting)) } }, dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text(t("cancel", languageSetting)) } })
         if (repoToDelete != null) AlertDialog(onDismissRequest = { repoToDelete = null }, title = { Text(t("delete_project_title", languageSetting)) }, text = { Text(t("delete_project_confirm", languageSetting).replace("%s", repoToDelete!!.name)) }, confirmButton = { Button(onClick = { val r = repoToDelete!!; repoToDelete = null; scope.launch { if (if (platform == "GitHub") deleteGitHubRepo(token, owner, r.name) else deleteCodebergRepo(token, owner, r.name)) refresh() } }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(t("yes_delete", languageSetting)) } }, dismissButton = { TextButton(onClick = { repoToDelete = null }) { Text(t("cancel", languageSetting)) } })
+        if (repoToRename != null) AlertDialog(onDismissRequest = { repoToRename = null }, title = { Text(t("rename_project_title", languageSetting)) }, text = { Column { OutlinedTextField(value = renameRepoNameInput, onValueChange = { renameRepoNameInput = it }, label = { Text(t("new_name", languageSetting)) }) } }, confirmButton = { Button(onClick = { val r = repoToRename!!; repoToRename = null; scope.launch { if (if (platform == "GitHub") renameGitHubRepo(token, owner, r.name, renameRepoNameInput) else renameCodebergRepo(token, owner, r.name, renameRepoNameInput)) refresh() } }) { Text(t("rename", languageSetting)) } }, dismissButton = { TextButton(onClick = { repoToRename = null }) { Text(t("cancel", languageSetting)) } })
     }
 }
 
@@ -1248,6 +1271,18 @@ private fun isApkValid(context: Context, file: File): Boolean {
     } catch (e: Exception) { false }
 }
 
+private fun getApkIcon(context: Context, file: File): Drawable? {
+    return try {
+        val pm = context.packageManager
+        val info = pm.getPackageArchiveInfo(file.absolutePath, 0)
+        info?.applicationInfo?.let {
+            it.sourceDir = file.absolutePath
+            it.publicSourceDir = file.absolutePath
+            it.loadIcon(pm)
+        }
+    } catch (e: Exception) { null }
+}
+
 private suspend fun repairApk(context: Context, file: File, platform: String, owner: String, repo: String, version: String, ghToken: String, cbToken: String, languageSetting: String, onProgress: (String) -> Unit): Boolean = withContext(Dispatchers.IO) {
     try {
         val app = OpenSourceApp("", repo, owner, platform, "", "", "")
@@ -1316,6 +1351,7 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
 
     LaunchedEffect(filterOpen) { refresh() }
 
+    val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
             topBar = {
@@ -1674,6 +1710,7 @@ fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String
 
     AlertDialog(
         onDismissRequest = { onDismiss(null) },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         title = { Text(t("new_issue", languageSetting)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -1891,4 +1928,18 @@ private suspend fun deleteGitHubRepo(token: String, owner: String, repo: String)
 
 private suspend fun deleteCodebergRepo(token: String, owner: String, repo: String): Boolean = withContext(Dispatchers.IO) {
     try { httpClient.newCall(Request.Builder().url("https://codeberg.org/api/v1/repos/$owner/$repo").delete().addHeader("Authorization", "token $token").build()).execute().use { it.isSuccessful } } catch (e: Exception) { false }
+}
+
+private suspend fun renameGitHubRepo(token: String, owner: String, oldName: String, newName: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val body = JSONObject().apply { put("name", newName) }.toString().toRequestBody("application/json".toMediaType())
+        httpClient.newCall(Request.Builder().url("https://api.github.com/repos/$owner/$oldName").patch(body).addHeader("Authorization", "Bearer $token").build()).execute().use { it.isSuccessful }
+    } catch (e: Exception) { false }
+}
+
+private suspend fun renameCodebergRepo(token: String, owner: String, oldName: String, newName: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val body = JSONObject().apply { put("name", newName) }.toString().toRequestBody("application/json".toMediaType())
+        httpClient.newCall(Request.Builder().url("https://codeberg.org/api/v1/repos/$owner/$oldName").patch(body).addHeader("Authorization", "token $token").build()).execute().use { it.isSuccessful }
+    } catch (e: Exception) { false }
 }
