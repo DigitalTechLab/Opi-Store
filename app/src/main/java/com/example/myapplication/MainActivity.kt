@@ -24,7 +24,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -71,14 +73,14 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 // --- DATENMODELLE ---
-data class AppRelease(val version: String, val downloadUrl: String, val isPreRelease: Boolean)
+data class AppRelease(val version: String, val downloadUrl: String, val isPreRelease: Boolean, val body: String = "")
 data class OpenSourceApp(
     val id: String, val name: String, val owner: String, val platform: String,
     val description: String, val repoUrl: String, val avatarUrl: String,
     val preFetchedReleases: List<AppRelease>? = null
 )
 data class UserProfile(val name: String, val login: String, val avatarUrl: String, val bio: String, val platform: String)
-data class SimpleRepo(val name: String, val owner: String, val description: String, val htmlUrl: String, val stars: Int, val avatarUrl: String = "")
+data class SimpleRepo(val name: String, val owner: String, val description: String, val htmlUrl: String, val stars: Int, val avatarUrl: String = "", val defaultBranch: String = "main")
 data class ProjectFile(val name: String, val path: String, val type: String, val sha: String, val downloadUrl: String?)
 data class DownloadInfo(val progress: String = "", val isDownloading: Boolean = false, val isDownloaded: Boolean = false)
 data class Issue(val id: String, val number: Int, val title: String, val body: String, val state: String, val user: String, val userAvatar: String, val comments: Int, val nodeId: String? = null)
@@ -171,6 +173,7 @@ private fun t(key: String, lang: String): String {
         "mb_loaded" -> if (isDe) "MB geladen" else "MB loaded"
         "stable_releases_header" -> if (isDe) "✅ STABLE RELEASES" else "✅ STABLE RELEASES"
         "pre_releases_header" -> if (isDe) "⚠️ PRE-RELEASES" else "⚠️ PRE-RELEASES"
+        "changelog" -> if (isDe) "Changelog" else "Changelog"
         "tutorial" -> if (isDe) "Tutorial" else "Tutorial"
         "github_tutorial_title" -> if (isDe) "GitHub Token Tutorial" else "GitHub Token Tutorial"
         "github_tutorial_step1" -> if (isDe) "1. Öffne diesen Link: https://github.com/settings/tokens" else "1. Open this link: https://github.com/settings/tokens"
@@ -233,13 +236,14 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
     var isViewingOwnProfile by remember { mutableStateOf(false) }
     var selectedRepoForFiles by remember { mutableStateOf<SimpleRepo?>(null) }
     var selectedFileForEdit by remember { mutableStateOf<ProjectFile?>(null) }
+    var selectedBranch by remember { mutableStateOf<String?>(null) }
 
     if (selectedFileForEdit != null && selectedRepoForFiles != null) {
-        CodeEditorScreen(repo = selectedRepoForFiles!!, file = selectedFileForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedFileForEdit = null }, languageSetting = languageSetting)
+        CodeEditorScreen(repo = selectedRepoForFiles!!, file = selectedFileForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedFileForEdit = null }, languageSetting = languageSetting, branch = selectedBranch)
     } else if (selectedRepoForFiles != null) {
-        ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting)
+        ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null; selectedBranch = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting, selectedBranch = selectedBranch, onBranchChange = { selectedBranch = it })
     } else if (showFullRepoListForUser != null) {
-        FullRepoListScreen(owner = showFullRepoListForUser!!, title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else t("my_repositories", languageSetting), token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, appsOnly = fullRepoListAppsOnly, isOwnProfile = isViewingOwnProfile, ownerAvatarUrl = fullRepoListAvatarUrl, onBack = { showFullRepoListForUser = null }, onAppSelected = { showFullRepoListForUser = null; selectedAppForDetail = it }, onRepoSelected = { selectedRepoForFiles = it }, githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting)
+        FullRepoListScreen(owner = showFullRepoListForUser!!, title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else t("my_repositories", languageSetting), token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, appsOnly = fullRepoListAppsOnly, isOwnProfile = isViewingOwnProfile, ownerAvatarUrl = fullRepoListAvatarUrl, onBack = { showFullRepoListForUser = null }, onAppSelected = { showFullRepoListForUser = null; selectedAppForDetail = it }, onRepoSelected = { selectedBranch = it.defaultBranch; selectedRepoForFiles = it }, githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting)
     } else if (selectedAppForDetail != null) {
         AppDetailFullScreen(
             app = selectedAppForDetail!!, 
@@ -746,6 +750,15 @@ fun AppDetailFullScreen(
                                 Text(if (downloadState.isDownloading) t("downloading", languageSetting) else t("download_apk", languageSetting), fontSize = 18.sp) 
                             }
                         }
+
+                        if (selectedRelease!!.body.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text(t("changelog", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                                MarkdownBody(text = selectedRelease!!.body, modifier = Modifier.padding(16.dp))
+                            }
+                        }
                     }
                 }
             }
@@ -766,13 +779,24 @@ fun AppDetailFullScreen(
     }
 
     if (showVersionSheet && releases != null) {
-        ModalBottomSheet(onDismissRequest = { showVersionSheet = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 12.dp, dragHandle = { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) } }) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)); Spacer(Modifier.width(12.dp)); Text(t("select_version", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.Black) }
-                LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+        ModalBottomSheet(
+            onDismissRequest = { showVersionSheet = false }, 
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), 
+            containerColor = MaterialTheme.colorScheme.surface, 
+            tonalElevation = 8.dp, 
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp)) {
                     val (stable, pre) = releases!!.partition { !it.isPreRelease }
-                    if (stable.isNotEmpty()) { item { Text(t("stable_releases_header", languageSetting), color = Color(0xFF4CAF50), fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp)) }; items(stable) { VersionItem(it, it == selectedRelease, languageSetting = languageSetting) { selectedRelease = it; showVersionSheet = false } } }
-                    if (pre.isNotEmpty()) { item { Spacer(modifier = Modifier.height(16.dp)); Text(t("pre_releases_header", languageSetting), color = Color(0xFFFFA000), fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)) }; items(pre) { VersionItem(it, it == selectedRelease, languageSetting = languageSetting) { selectedRelease = it; showVersionSheet = false } } }
+                    if (stable.isNotEmpty()) { 
+                        item { Text(t("stable_releases_header", languageSetting), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp)) }
+                        items(stable) { VersionItem(it, it == selectedRelease) { selectedRelease = it; showVersionSheet = false } } 
+                    }
+                    if (pre.isNotEmpty()) { 
+                        item { Spacer(modifier = Modifier.height(12.dp)); Text(t("pre_releases_header", languageSetting), color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) }
+                        items(pre) { VersionItem(it, it == selectedRelease) { selectedRelease = it; showVersionSheet = false } } 
+                    }
                 }
             }
         }
@@ -780,11 +804,34 @@ fun AppDetailFullScreen(
 }
 
 @Composable
-fun VersionItem(release: AppRelease, isSelected: Boolean, languageSetting: String, onClick: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(16.dp)).clickable { onClick() }, color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(modifier = Modifier.weight(1f)) { Text(text = release.version, fontSize = 17.sp, fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface); Text(text = if (release.isPreRelease) t("beta_experimental", languageSetting) else t("stable_build", languageSetting), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (release.isPreRelease) Color(0xFFFFA000) else Color(0xFF4CAF50)) }
-            Icon(imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(if (isSelected) 24.dp else 20.dp))
+fun VersionItem(release: AppRelease, isSelected: Boolean, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
+        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = release.version,
+                fontSize = 16.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -968,20 +1015,42 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProjectFilesScreen(repo: SimpleRepo, token: String, platform: String, onBack: () -> Unit, onFileClick: (ProjectFile) -> Unit, languageSetting: String) {
+fun ProjectFilesScreen(
+    repo: SimpleRepo, 
+    token: String, 
+    platform: String, 
+    onBack: () -> Unit, 
+    onFileClick: (ProjectFile) -> Unit, 
+    languageSetting: String,
+    selectedBranch: String?,
+    onBranchChange: (String) -> Unit
+) {
     val context = LocalContext.current; val scope = rememberCoroutineScope()
     var currentPath by remember { mutableStateOf("") }
     var files by remember { mutableStateOf<List<ProjectFile>>(emptyList()) }; var isLoading by remember { mutableStateOf(true) }
+    
+    var branches by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showBranchDropdown by remember { mutableStateOf(false) }
 
     fun refreshFiles() {
         isLoading = true
         scope.launch {
-            files = fetchFilesFromPlatform(token, repo.owner, repo.name, platform, currentPath)
+            files = fetchFilesFromPlatform(token, repo.owner, repo.name, platform, currentPath, selectedBranch)
             isLoading = false
         }
     }
 
-    LaunchedEffect(currentPath) { refreshFiles() }
+    LaunchedEffect(repo) {
+        scope.launch {
+            val b = fetchBranches(token, repo.owner, repo.name, platform)
+            branches = b
+            if (selectedBranch == null && b.isNotEmpty()) {
+                onBranchChange(repo.defaultBranch)
+            }
+        }
+    }
+
+    LaunchedEffect(currentPath, selectedBranch) { refreshFiles() }
 
     BackHandler {
         if (currentPath.isEmpty()) onBack()
@@ -994,7 +1063,7 @@ fun ProjectFilesScreen(repo: SimpleRepo, token: String, platform: String, onBack
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) scope.launch {
         val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
         val pathPrefix = if (currentPath.isEmpty()) "" else "$currentPath/"
-        if (bytes != null && uploadFileToPlatform(token, repo.owner, repo.name, "${pathPrefix}upload_${System.currentTimeMillis()}.png", Base64.encodeToString(bytes, Base64.NO_WRAP), platform, languageSetting)) {
+        if (bytes != null && uploadFileToPlatform(token, repo.owner, repo.name, "${pathPrefix}upload_${System.currentTimeMillis()}.png", Base64.encodeToString(bytes, Base64.NO_WRAP), platform, languageSetting, selectedBranch)) {
             Toast.makeText(context, t("uploaded", languageSetting), Toast.LENGTH_SHORT).show()
             refreshFiles()
         }
@@ -1005,7 +1074,7 @@ fun ProjectFilesScreen(repo: SimpleRepo, token: String, platform: String, onBack
             TopAppBar(
                 title = { 
                     Column { 
-                        Text(repo.name)
+                        Text(repo.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (currentPath.isNotEmpty()) Text(currentPath, fontSize = 10.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }, 
@@ -1017,6 +1086,30 @@ fun ProjectFilesScreen(repo: SimpleRepo, token: String, platform: String, onBack
                             currentPath = if (parts.size <= 1) "" else parts.dropLast(1).joinToString("/")
                         }
                     }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } 
+                },
+                actions = {
+                    Box {
+                        TextButton(onClick = { showBranchDropdown = true }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AccountTree, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(selectedBranch ?: "...", fontSize = 14.sp)
+                                Icon(Icons.Default.ArrowDropDown, null)
+                            }
+                        }
+                        DropdownMenu(expanded = showBranchDropdown, onDismissRequest = { showBranchDropdown = false }) {
+                            branches.forEach { b ->
+                                DropdownMenuItem(
+                                    text = { Text(b) },
+                                    onClick = { 
+                                        onBranchChange(b)
+                                        showBranchDropdown = false 
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.AccountTree, null, modifier = Modifier.size(18.dp)) }
+                                )
+                            }
+                        }
+                    }
                 }
             ) 
         }, 
@@ -1041,13 +1134,139 @@ fun ProjectFilesScreen(repo: SimpleRepo, token: String, platform: String, onBack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platform: String, onBack: () -> Unit, languageSetting: String) {
-    val scope = rememberCoroutineScope(); var text by remember { mutableStateOf("") }; var isLoading by remember { mutableStateOf(true) }; var isSaving by remember { mutableStateOf(false) }
+fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platform: String, onBack: () -> Unit, languageSetting: String, branch: String? = null) {
+    val scope = rememberCoroutineScope()
+    var text by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+    var isSaving by remember { mutableStateOf(false) }
+    
+    // Theme Colors
+    val editorBackground = MaterialTheme.colorScheme.surface
+    val gutterBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val gutterText = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val separatorLine = MaterialTheme.colorScheme.outlineVariant
+    val accentColor = MaterialTheme.colorScheme.primary
+
     BackHandler { onBack() }
-    LaunchedEffect(Unit) { text = fetchFileContent(token, repo.owner, repo.name, file.path, platform) ?: ""; isLoading = false }
-    Scaffold(topBar = { TopAppBar(title = { Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.Close, t("cancel", languageSetting)) } }, actions = { if (isSaving) CircularProgressIndicator(Modifier.size(24.dp)) else IconButton(onClick = { isSaving = true; scope.launch { if (updateFileOnPlatform(token, repo.owner, repo.name, file.path, text, file.sha, platform, languageSetting)) onBack() else isSaving = false } }) { Icon(Icons.Default.Save, null, tint = Color.Cyan) } }) }) { padding ->
-        if (isLoading) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        else TextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxSize().padding(padding), colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black), textStyle = androidx.compose.ui.text.TextStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 14.sp))
+    
+    LaunchedEffect(Unit) {
+        text = fetchFileContent(token, repo.owner, repo.name, file.path, platform, branch) ?: ""
+        isLoading = false
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Code, null, tint = accentColor, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(file.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                if (branch != null) {
+                                    Spacer(Modifier.width(8.dp))
+                                    Surface(color = accentColor.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+                                        Text(branch, fontSize = 10.sp, color = accentColor, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                    }
+                                }
+                            }
+                            Text(file.path, fontSize = 10.sp, color = gutterText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = textColor)
+                    }
+                },
+                actions = {
+                    if (isSaving) {
+                        CircularProgressIndicator(Modifier.size(24.dp), color = accentColor, strokeWidth = 2.dp)
+                    } else {
+                        TextButton(onClick = {
+                            isSaving = true
+                            scope.launch {
+                                if (updateFileOnPlatform(token, repo.owner, repo.name, file.path, text, file.sha, platform, languageSetting, branch)) {
+                                    onBack()
+                                } else {
+                                    isSaving = false
+                                }
+                            }
+                        }) {
+                            Text(t("save", languageSetting).uppercase(), color = accentColor, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        }
+    ) { padding ->
+        if (isLoading) {
+            Box(Modifier.fillMaxSize().background(editorBackground), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = accentColor)
+            }
+        } else {
+            val verticalScrollState = rememberScrollState()
+            val horizontalScrollState = rememberScrollState()
+            val lines = text.lines()
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(editorBackground)
+            ) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Line numbers column
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .background(gutterBackground)
+                            .verticalScroll(verticalScrollState)
+                            .padding(top = 12.dp, bottom = 100.dp, start = 8.dp, end = 8.dp),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        lines.indices.forEach { i ->
+                            Text(
+                                text = (i + 1).toString(),
+                                fontSize = 12.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = gutterText,
+                                style = androidx.compose.ui.text.TextStyle(lineHeight = 20.sp),
+                                modifier = Modifier.height(20.dp)
+                            )
+                        }
+                    }
+
+                    // Vertical separator
+                    Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(separatorLine))
+
+                    // Editor area
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(verticalScrollState)
+                            .horizontalScroll(horizontalScrollState)
+                            .padding(top = 12.dp, bottom = 100.dp, start = 8.dp, end = 100.dp)
+                    ) {
+                        BasicTextField(
+                            value = text,
+                            onValueChange = { text = it },
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 13.sp,
+                                color = textColor,
+                                lineHeight = 20.sp
+                            ),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(accentColor),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1085,7 +1304,7 @@ private suspend fun fetchGitHubReposForOwner(owner: String, token: String, isOwn
             val arr = JSONArray(resp.body?.string() ?: "[]")
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); val ownerObj = obj.optJSONObject("owner") ?: continue
-                list.add(SimpleRepo(obj.getString("name"), ownerObj.getString("login"), obj.optString("description", ""), obj.getString("html_url"), obj.optInt("stargazers_count", 0), ownerObj.optString("avatar_url", "")))
+                list.add(SimpleRepo(obj.getString("name"), ownerObj.getString("login"), obj.optString("description", ""), obj.getString("html_url"), obj.optInt("stargazers_count", 0), ownerObj.optString("avatar_url", ""), obj.optString("default_branch", "main")))
             }
         }
     } catch (e: Exception) {}
@@ -1102,7 +1321,7 @@ private suspend fun fetchCodebergReposForOwner(owner: String, token: String, isO
             val arr = JSONArray(resp.body?.string() ?: "[]")
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); val ownerObj = obj.optJSONObject("owner") ?: continue
-                list.add(SimpleRepo(obj.getString("name"), ownerObj.getString("login"), obj.optString("description", ""), obj.getString("html_url"), obj.optInt("stargazers_count", 0), ownerObj.optString("avatar_url", "")))
+                list.add(SimpleRepo(obj.getString("name"), ownerObj.getString("login"), obj.optString("description", ""), obj.getString("html_url"), obj.optInt("stargazers_count", 0), ownerObj.optString("avatar_url", ""), obj.optString("default_branch", "main")))
             }
         }
     } catch (e: Exception) {}
@@ -1118,7 +1337,7 @@ private suspend fun fetchUserRepos(token: String, url: String): List<SimpleRepo>
             val arr = JSONArray(resp.body?.string() ?: "[]")
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); val owner = obj.optJSONObject("owner") ?: continue
-                list.add(SimpleRepo(obj.getString("name"), owner.getString("login"), obj.optString("description", ""), obj.getString("html_url"), obj.optInt("stargazers_count", 0), owner.optString("avatar_url", "")))
+                list.add(SimpleRepo(obj.getString("name"), owner.getString("login"), obj.optString("description", ""), obj.getString("html_url"), obj.optInt("stargazers_count", 0), owner.optString("avatar_url", ""), obj.optString("default_branch", "main")))
             }
         }
     } catch (e: Exception) {}
@@ -1198,7 +1417,7 @@ private suspend fun fetchGitHubReleases(owner: String, repo: String, token: Stri
                 val rel = arr.getJSONObject(i); val assets = rel.optJSONArray("assets") ?: continue
                 for (a in 0 until assets.length()) {
                     val asset = assets.getJSONObject(a)
-                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"))) }
+                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"), rel.optString("body", ""))) }
                 }
             }
         }
@@ -1217,7 +1436,7 @@ private suspend fun fetchCodebergReleases(owner: String, repo: String, token: St
                 val rel = arr.getJSONObject(i); val assets = rel.optJSONArray("assets") ?: continue
                 for (a in 0 until assets.length()) {
                     val asset = assets.getJSONObject(a)
-                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"))) }
+                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"), rel.optString("body", ""))) }
                 }
             }
         }
@@ -1471,9 +1690,39 @@ fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
                     contentScale = ContentScale.Fit
                 )
             } else if (txt.isNotBlank()) {
-                Text(txt, fontSize = 14.sp)
+                Text(
+                    text = parseMarkdown(txt),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
             }
         }
+    }
+}
+
+private fun parseMarkdown(text: String): androidx.compose.ui.text.AnnotatedString {
+    return buildAnnotatedString {
+        val boldRegex = "\\*\\*(.*?)\\*\\*".toRegex()
+        val italicRegex = "(?<!\\*)\\*(?!\\*)(.*?)(?<!\\*)\\*(?!\\*)".toRegex()
+
+        var lastIdx = 0
+        val matches = (boldRegex.findAll(text).map { it to "bold" } + 
+                       italicRegex.findAll(text).map { it to "italic" })
+                      .sortedBy { it.first.range.first }
+
+        matches.forEach { (match, type) ->
+            if (match.range.first >= lastIdx) {
+                append(text.substring(lastIdx, match.range.first))
+                withStyle(style = SpanStyle(
+                    fontWeight = if (type == "bold") FontWeight.Bold else FontWeight.Normal,
+                    fontStyle = if (type == "italic") androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                )) {
+                    append(match.groupValues[1])
+                }
+                lastIdx = match.range.last + 1
+            }
+        }
+        append(text.substring(lastIdx))
     }
 }
 
@@ -1870,12 +2119,27 @@ private suspend fun toggleReaction(token: String, owner: String, repo: String, p
     } catch (e: Exception) { false }
 }
 
-private suspend fun fetchFilesFromPlatform(token: String, owner: String, repo: String, platform: String, path: String = ""): List<ProjectFile> = withContext(Dispatchers.IO) {
+private suspend fun fetchBranches(token: String, owner: String, repo: String, platform: String): List<String> = withContext(Dispatchers.IO) {
+    val list = mutableListOf<String>()
+    try {
+        val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
+        val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/branches" else "https://codeberg.org/api/v1/repos/$owner/$repo/branches"
+        httpClient.newCall(Request.Builder().url(url).addHeader("Authorization", authHeader).build()).execute().use { resp ->
+            if (!resp.isSuccessful) return@withContext emptyList()
+            val arr = JSONArray(resp.body?.string() ?: "[]")
+            for (i in 0 until arr.length()) { list.add(arr.getJSONObject(i).getString("name")) }
+        }
+    } catch (e: Exception) {}
+    list
+}
+
+private suspend fun fetchFilesFromPlatform(token: String, owner: String, repo: String, platform: String, path: String = "", branch: String? = null): List<ProjectFile> = withContext(Dispatchers.IO) {
     val list = mutableListOf<ProjectFile>()
     try {
         val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
         val baseUrl = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents"
-        val url = if (path.isEmpty()) baseUrl else "$baseUrl/$path"
+        var url = if (path.isEmpty()) baseUrl else "$baseUrl/$path"
+        if (branch != null) url += "?ref=$branch"
         
         httpClient.newCall(Request.Builder().url(url).addHeader("Authorization", authHeader).build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext emptyList()
@@ -1886,10 +2150,11 @@ private suspend fun fetchFilesFromPlatform(token: String, owner: String, repo: S
     list.sortedBy { it.type == "file" }
 }
 
-private suspend fun fetchFileContent(token: String, owner: String, repo: String, path: String, platform: String): String? = withContext(Dispatchers.IO) {
+private suspend fun fetchFileContent(token: String, owner: String, repo: String, path: String, platform: String, branch: String? = null): String? = withContext(Dispatchers.IO) {
     try {
         val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
-        val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents/$path" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents/$path"
+        var url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents/$path" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents/$path"
+        if (branch != null) url += "?ref=$branch"
         httpClient.newCall(Request.Builder().url(url).addHeader("Authorization", authHeader).build()).execute().use { resp ->
             val json = JSONObject(resp.body?.string() ?: "")
             String(Base64.decode(json.getString("content").replace("\n", ""), Base64.DEFAULT))
@@ -1897,20 +2162,31 @@ private suspend fun fetchFileContent(token: String, owner: String, repo: String,
     } catch (e: Exception) { null }
 }
 
-private suspend fun updateFileOnPlatform(token: String, owner: String, repo: String, path: String, content: String, sha: String, platform: String, languageSetting: String): Boolean = withContext(Dispatchers.IO) {
+private suspend fun updateFileOnPlatform(token: String, owner: String, repo: String, path: String, content: String, sha: String, platform: String, languageSetting: String, branch: String? = null): Boolean = withContext(Dispatchers.IO) {
     try {
         val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents/$path" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents/$path"
-        val body = JSONObject().apply { put("message", t("edit_via_app", languageSetting)); put("content", Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP)); put("sha", sha) }.toString().toRequestBody("application/json".toMediaType())
+        val bodyObj = JSONObject().apply { 
+            put("message", t("edit_via_app", languageSetting))
+            put("content", Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP))
+            put("sha", sha)
+            if (branch != null) put("branch", branch)
+        }
+        val body = bodyObj.toString().toRequestBody("application/json".toMediaType())
         httpClient.newCall(Request.Builder().url(url).put(body).addHeader("Authorization", authHeader).build()).execute().use { it.isSuccessful }
     } catch (e: Exception) { false }
 }
 
-private suspend fun uploadFileToPlatform(token: String, owner: String, repo: String, path: String, content: String, platform: String, languageSetting: String): Boolean = withContext(Dispatchers.IO) {
+private suspend fun uploadFileToPlatform(token: String, owner: String, repo: String, path: String, content: String, platform: String, languageSetting: String, branch: String? = null): Boolean = withContext(Dispatchers.IO) {
     try {
         val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents/$path" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents/$path"
-        val body = JSONObject().apply { put("message", t("upload_via_app", languageSetting)); put("content", content) }.toString().toRequestBody("application/json".toMediaType())
+        val bodyObj = JSONObject().apply { 
+            put("message", t("upload_via_app", languageSetting))
+            put("content", content)
+            if (branch != null) put("branch", branch)
+        }
+        val body = bodyObj.toString().toRequestBody("application/json".toMediaType())
         httpClient.newCall(Request.Builder().url(url).put(body).addHeader("Authorization", authHeader).build()).execute().use { it.isSuccessful }
     } catch (e: Exception) { false }
 }
