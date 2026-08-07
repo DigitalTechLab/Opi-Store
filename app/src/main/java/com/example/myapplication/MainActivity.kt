@@ -194,6 +194,17 @@ private fun t(key: String, lang: String): String {
         "codeberg_tutorial_step7" -> if (isDe) "7. Klicke auf \"Token generieren\"." else "7. Click \"Generate Token\"."
         "codeberg_tutorial_step8" -> if (isDe) "8. Kopiere den Token und füge ihn hier in der App ein." else "8. Copy the token and paste it here in the app."
         "version" -> "Version"
+        "updates" -> if (isDe) "Updates" else "Updates"
+        "update_available" -> if (isDe) "Update verfügbar" else "Update available"
+        "update_now" -> if (isDe) "Jetzt aktualisieren" else "Update now"
+        "current_version" -> if (isDe) "Aktuelle Version" else "Current version"
+        "new_version" -> if (isDe) "Neue Version" else "New version"
+        "download_complete" -> if (isDe) "Download abgeschlossen" else "Download complete"
+        "automatic_updates" -> if (isDe) "Nach Updates suchen" else "Check for updates"
+        "on" -> if (isDe) "An" else "On"
+        "off" -> if (isDe) "Aus" else "Off"
+        "later" -> if (isDe) "Vielleicht später" else "Maybe later"
+        "changelog_title" -> if (isDe) "Was ist neu?" else "What's new?"
         else -> key
     }
 }
@@ -221,12 +232,39 @@ class MainActivity : AppCompatActivity() {
 @Composable
 fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSetting: MutableState<String>) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var githubToken by remember { mutableStateOf(sharedPrefs.getString("GITHUB_TOKEN", "") ?: "") }
-    var codebergToken by remember { mutableStateOf(sharedPrefs.getString("CODEBERG_TOKEN", "") ?: "") }
+    var githubToken by rememberSaveable { mutableStateOf(sharedPrefs.getString("GITHUB_TOKEN", "") ?: "") }
+    var codebergToken by rememberSaveable { mutableStateOf(sharedPrefs.getString("CODEBERG_TOKEN", "") ?: "") }
     var languageSetting by remember { mutableStateOf(sharedPrefs.getString("LANGUAGE_SETTING", "en") ?: "en") }
+
+    var updatesEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("UPDATES_ENABLED", true)) }
+    var skippedVersion by remember { mutableStateOf(sharedPrefs.getString("SKIPPED_VERSION", "") ?: "") }
+    var showUpdateScreen by remember { mutableStateOf<AppRelease?>(null) }
 
     val activeDownloads = remember { mutableStateMapOf<String, DownloadInfo>() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        try {
+            val file = java.io.File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
+            if (file.exists()) file.delete()
+        } catch (e: Exception) {}
+    }
+
+    LaunchedEffect(updatesEnabled) {
+        if (updatesEnabled) {
+            val latest = checkAppUpdate()
+            if (latest != null) {
+                val currentVer = try {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0"
+                } catch (e: Exception) { "0.0" }
+
+                if (isNewerVersion(currentVer, latest.version) && latest.version != skippedVersion) {
+                    showUpdateScreen = latest
+                }
+            }
+        }
+    }
 
     var selectedAppForDetail by remember { mutableStateOf<OpenSourceApp?>(null) }
     var showFullRepoListForUser by remember { mutableStateOf<String?>(null) }
@@ -238,7 +276,22 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
     var selectedFileForEdit by remember { mutableStateOf<ProjectFile?>(null) }
     var selectedBranch by remember { mutableStateOf<String?>(null) }
 
-    if (selectedFileForEdit != null && selectedRepoForFiles != null) {
+    if (showUpdateScreen != null) {
+        UpdateScreen(
+            currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0" } catch (e: Exception) { "0.0" },
+            newVersion = showUpdateScreen!!.version,
+            changelog = showUpdateScreen!!.body,
+            downloadUrl = showUpdateScreen!!.downloadUrl,
+            onCancel = {
+                skippedVersion = showUpdateScreen!!.version
+                sharedPrefs.edit().putString("SKIPPED_VERSION", skippedVersion).apply()
+                showUpdateScreen = null
+            },
+            languageSetting = languageSetting,
+            context = context,
+            scope = scope
+        )
+    } else if (selectedFileForEdit != null && selectedRepoForFiles != null) {
         CodeEditorScreen(repo = selectedRepoForFiles!!, file = selectedFileForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedFileForEdit = null }, languageSetting = languageSetting, branch = selectedBranch)
     } else if (selectedRepoForFiles != null) {
         ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null; selectedBranch = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting, selectedBranch = selectedBranch, onBranchChange = { selectedBranch = it })
@@ -246,17 +299,17 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
         FullRepoListScreen(owner = showFullRepoListForUser!!, title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else t("my_repositories", languageSetting), token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, appsOnly = fullRepoListAppsOnly, isOwnProfile = isViewingOwnProfile, ownerAvatarUrl = fullRepoListAvatarUrl, onBack = { showFullRepoListForUser = null }, onAppSelected = { showFullRepoListForUser = null; selectedAppForDetail = it }, onRepoSelected = { selectedBranch = it.defaultBranch; selectedRepoForFiles = it }, githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting)
     } else if (selectedAppForDetail != null) {
         AppDetailFullScreen(
-            app = selectedAppForDetail!!, 
-            githubToken = githubToken, 
-            codebergToken = codebergToken, 
-            onBack = { selectedAppForDetail = null }, 
-            onOwnerClick = { owner, platform, avatar -> 
+            app = selectedAppForDetail!!,
+            githubToken = githubToken,
+            codebergToken = codebergToken,
+            onBack = { selectedAppForDetail = null },
+            onOwnerClick = { owner, platform, avatar ->
                 fullRepoListPlatform = platform
                 fullRepoListAppsOnly = true
                 fullRepoListAvatarUrl = avatar
                 isViewingOwnProfile = false
-                showFullRepoListForUser = owner 
-            }, 
+                showFullRepoListForUser = owner
+            },
             languageSetting = languageSetting,
             activeDownloads = activeDownloads,
             globalScope = scope
@@ -279,10 +332,30 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
                 when (selectedTab) {
-                    0 -> SearchScreen(githubToken = githubToken, codebergToken = codebergToken, onAppSelected = { selectedAppForDetail = it }, languageSetting = languageSetting)
+                    0 -> SearchScreen(
+                        githubToken = githubToken,
+                        codebergToken = codebergToken,
+                        onAppSelected = { selectedAppForDetail = it },
+                        onUserSelected = { owner, platform, avatar ->
+                            fullRepoListPlatform = platform
+                            fullRepoListAppsOnly = true
+                            fullRepoListAvatarUrl = avatar
+                            isViewingOwnProfile = false
+                            showFullRepoListForUser = owner
+                        },
+                        languageSetting = languageSetting
+                    )
                     1 -> ApkManagerScreen(githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, activeDownloads = activeDownloads, globalScope = scope)
                     2 -> AccountMultiScreen(githubToken = githubToken, codebergToken = codebergToken, onGithubTokenSaved = { t -> githubToken = t; sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply() }, onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() }, onUsernameClick = { login -> fullRepoListPlatform = if (sharedPrefs.getString("LAST_PLATFORM", "GitHub") == "GitHub") "GitHub" else "Codeberg"; fullRepoListAppsOnly = false; fullRepoListAvatarUrl = ""; isViewingOwnProfile = true; showFullRepoListForUser = login }, languageSetting = languageSetting, onAppSelected = { selectedAppForDetail = it })
-                    3 -> SettingsScreen(currentTheme = themeSetting.value, onThemeChange = { themeSetting.value = it; sharedPrefs.edit().putString("THEME_SETTING", it).apply() }, currentLanguage = languageSetting, onLanguageChange = { languageSetting = it; sharedPrefs.edit().putString("LANGUAGE_SETTING", it).apply() }, languageSetting = languageSetting)
+                    3 -> SettingsScreen(
+                        currentTheme = themeSetting.value,
+                        onThemeChange = { themeSetting.value = it; sharedPrefs.edit().putString("THEME_SETTING", it).apply() },
+                        currentLanguage = languageSetting,
+                        onLanguageChange = { languageSetting = it; sharedPrefs.edit().putString("LANGUAGE_SETTING", it).apply() },
+                        updatesEnabled = updatesEnabled,
+                        onUpdatesEnabledChange = { updatesEnabled = it; sharedPrefs.edit().putBoolean("UPDATES_ENABLED", it).apply() },
+                        languageSetting = languageSetting
+                    )
                 }
             }
         }
@@ -295,15 +368,18 @@ fun SettingsScreen(
     onThemeChange: (String) -> Unit,
     currentLanguage: String,
     onLanguageChange: (String) -> Unit,
+    updatesEnabled: Boolean,
+    onUpdatesEnabledChange: (Boolean) -> Unit,
     languageSetting: String
 ) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text(
-            text = t("settings_title", languageSetting), 
-            fontSize = 28.sp, 
+            text = t("settings_title", languageSetting),
+            fontSize = 28.sp,
             fontWeight = FontWeight.Black,
             modifier = Modifier.padding(bottom = 24.dp)
         )
@@ -364,6 +440,30 @@ fun SettingsScreen(
                 Text(langLabel, color = MaterialTheme.colorScheme.primary)
             }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Updates Button
+        Button(
+            onClick = { showUpdateDialog = true },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Update, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text(t("updates", languageSetting), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                }
+                Text(if (updatesEnabled) t("on", languageSetting) else t("off", languageSetting), color = MaterialTheme.colorScheme.primary)
+            }
+        }
     }
 
     if (showThemeDialog) {
@@ -406,6 +506,28 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = currentLanguage == code, onClick = { onLanguageChange(code); showLanguageDialog = false })
+                            Spacer(Modifier.width(12.dp))
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    if (showUpdateDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = { Text(t("automatic_updates", languageSetting)) },
+            text = {
+                Column {
+                    listOf(true to t("on", languageSetting), false to t("off", languageSetting)).forEach { (enabled, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onUpdatesEnabledChange(enabled); showUpdateDialog = false }.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = updatesEnabled == enabled, onClick = { onUpdatesEnabledChange(enabled); showUpdateDialog = false })
                             Spacer(Modifier.width(12.dp))
                             Text(label)
                         }
@@ -459,7 +581,7 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var editNameInput by remember { mutableStateOf("") }
     var editBioInput by remember { mutableStateOf("") }
-    
+
     var showTutorialDialog by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
@@ -467,11 +589,11 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
         if (token.isNotBlank()) {
             isCheckingToken = true; isEditingToken = false
             val profile = fetchProfile(token)
-            if (profile != null) { 
+            if (profile != null) {
                 userProfile = profile
                 ownRepos = fetchRepos(token)
-                starredRepos = fetchStarred(token) 
-                
+                starredRepos = fetchStarred(token)
+
                 // Pre-fetch releases for first few repos to avoid "loading" look
                 (ownRepos.take(5) + starredRepos.take(5)).forEach { repo ->
                     launch {
@@ -495,33 +617,49 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
                     Text(userProfile!!.name.ifBlank { userProfile!!.login }, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { editNameInput = userProfile!!.name.ifBlank { userProfile!!.login }; editBioInput = userProfile!!.bio; showEditProfileDialog = true }.padding(horizontal = 4.dp))
                     Text("@${userProfile!!.login}", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onUsernameClick(userProfile!!.login) }.padding(horizontal = 4.dp))
-                    if (userProfile!!.bio.isNotBlank()) { Spacer(modifier = Modifier.height(8.dp)); Text(userProfile!!.bio, fontSize = 14.sp, color = Color.LightGray, textAlign = TextAlign.Center) }
+                    if (userProfile!!.bio.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = userProfile!!.bio,
+                            fontSize = 14.sp,
+                            color = Color.LightGray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable {
+                                    editNameInput = userProfile!!.name.ifBlank { userProfile!!.login }
+                                    editBioInput = userProfile!!.bio
+                                    showEditProfileDialog = true
+                                }
+                                .padding(horizontal = 4.dp)
+                        )
+                    }
                     Text("✏️ ${t("tap_to_edit", languageSetting)}", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(modifier = Modifier.height(16.dp)); OutlinedButton(onClick = { isEditingToken = true }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("change_token", languageSetting)) }; Spacer(modifier = Modifier.height(24.dp))
             }
-            if (ownRepos.isNotEmpty()) { 
+            if (ownRepos.isNotEmpty()) {
                 item { Text(t("my_repositories", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) }
-                items(ownRepos) { repo -> 
-                    RepoCard(repo, languageSetting = languageSetting) { 
-                        onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platformName, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = repo.avatarUrl, preFetchedReleases = repoReleases[repo.htmlUrl])) 
-                    } 
+                items(ownRepos) { repo ->
+                    RepoCard(repo, languageSetting = languageSetting) {
+                        onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platformName, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = repo.avatarUrl, preFetchedReleases = repoReleases[repo.htmlUrl]))
+                    }
                 }
-                item { Spacer(modifier = Modifier.height(16.dp)) } 
+                item { Spacer(modifier = Modifier.height(16.dp)) }
             }
-            if (starredRepos.isNotEmpty()) { 
+            if (starredRepos.isNotEmpty()) {
                 item { Text(t("starred", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) }
-                items(starredRepos) { repo -> 
-                    RepoCard(repo, languageSetting = languageSetting) { 
-                        onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platformName, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = repo.avatarUrl, preFetchedReleases = repoReleases[repo.htmlUrl])) 
-                    } 
-                } 
+                items(starredRepos) { repo ->
+                    RepoCard(repo, languageSetting = languageSetting) {
+                        onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platformName, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = repo.avatarUrl, preFetchedReleases = repoReleases[repo.htmlUrl]))
+                    }
+                }
             }
         }
     } else {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(Icons.Default.Lock, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary); Spacer(modifier = Modifier.height(16.dp)); Text("$platformName ${t("login_title", languageSetting)}", fontSize = 24.sp, fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.height(16.dp)); 
-            OutlinedTextField(value = tokenInput, onValueChange = { tokenInput = it }, label = { Text(t("personal_access_token", languageSetting)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation()); 
+            Icon(Icons.Default.Lock, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary); Spacer(modifier = Modifier.height(16.dp)); Text("$platformName ${t("login_title", languageSetting)}", fontSize = 24.sp, fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.height(16.dp));
+            OutlinedTextField(value = tokenInput, onValueChange = { tokenInput = it }, label = { Text(t("personal_access_token", languageSetting)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation());
             if (platformName == "GitHub" || platformName == "Codeberg") {
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(onClick = { showTutorialDialog = true }, modifier = Modifier.align(Alignment.End)) { Icon(Icons.Default.Info, null, modifier = Modifier.size(18.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("tutorial", languageSetting)) }
@@ -538,7 +676,7 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     val prefix = if (platformName == "GitHub") "github" else "codeberg"
                     val url = if (platformName == "GitHub") "https://github.com/settings/tokens" else "https://codeberg.org/user/settings/applications"
-                    
+
                     val step1Full = t("${prefix}_tutorial_step1", languageSetting)
                     val annotatedStep1 = buildAnnotatedString {
                         val parts = step1Full.split(url)
@@ -549,7 +687,7 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
                         } else { append(step1Full) }
                     }
                     Text(annotatedStep1, modifier = Modifier.clickable { uriHandler.openUri(url) }, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(t("${prefix}_tutorial_step2", languageSetting))
                     Spacer(modifier = Modifier.height(4.dp))
@@ -585,7 +723,7 @@ fun RepoCard(repo: SimpleRepo, languageSetting: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (OpenSourceApp) -> Unit, languageSetting: String) {
+fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (OpenSourceApp) -> Unit, onUserSelected: (String, String, String) -> Unit, languageSetting: String) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<OpenSourceApp>>(emptyList()) }
@@ -596,14 +734,26 @@ fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (Ope
         scope.launch {
             try {
                 if (searchQuery.startsWith("http")) {
+                    val platform = if (searchQuery.contains("codeberg.org")) "Codeberg" else "GitHub"
+                    val domain = if (platform == "GitHub") "github.com/" else "codeberg.org/"
+                    val parts = searchQuery.substringAfter(domain).split("/").filter { it.isNotBlank() }
+
+                    if (parts.size == 1) {
+                        val username = parts[0]
+                        val avatar = if (platform == "GitHub") "https://github.com/$username.png" else ""
+                        onUserSelected(username, platform, avatar)
+                        isLoading = false
+                        return@launch
+                    }
+
                     statusMessage = t("status_loading_repo", languageSetting)
                     val app = fetchAppFromUrl(searchQuery, githubToken, codebergToken)
-                    if (app != null) { 
+                    if (app != null) {
                         val releases = fetchReleasesForApp(app, githubToken, codebergToken)
-                        if (releases.isNotEmpty()) { 
+                        if (releases.isNotEmpty()) {
                             onAppSelected(app.copy(preFetchedReleases = releases))
-                            statusMessage = "" 
-                        } else statusMessage = t("status_no_apks", languageSetting) 
+                            statusMessage = ""
+                        } else statusMessage = t("status_no_apks", languageSetting)
                     } else statusMessage = t("status_no_project", languageSetting)
                 } else {
                     statusMessage = t("status_searching", languageSetting)
@@ -639,11 +789,11 @@ fun AppCard(app: OpenSourceApp, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppDetailFullScreen(
-    app: OpenSourceApp, 
-    githubToken: String, 
-    codebergToken: String, 
-    onBack: () -> Unit, 
-    onOwnerClick: (String, String, String) -> Unit, 
+    app: OpenSourceApp,
+    githubToken: String,
+    codebergToken: String,
+    onBack: () -> Unit,
+    onOwnerClick: (String, String, String) -> Unit,
     languageSetting: String,
     activeDownloads: MutableMap<String, DownloadInfo>,
     globalScope: CoroutineScope
@@ -653,10 +803,10 @@ fun AppDetailFullScreen(
     val scrollState = rememberScrollState()
     var releases by remember { mutableStateOf<List<AppRelease>?>(null) }; var isLoadingReleases by remember { mutableStateOf(true) }
     var selectedRelease by remember { mutableStateOf<AppRelease?>(null) }; var showVersionSheet by remember { mutableStateOf(false) }
-    
+
     var showIssues by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(app) { 
+
+    LaunchedEffect(app) {
         if (app.preFetchedReleases != null) {
             releases = app.preFetchedReleases
             selectedRelease = app.preFetchedReleases.firstOrNull()
@@ -669,17 +819,17 @@ fun AppDetailFullScreen(
             isLoadingReleases = false
         }
     }
-    
+
     val expectedFileName = if (selectedRelease != null) "${app.platform}_${app.owner}_${app.name}_${selectedRelease!!.version}.apk" else ""
     val targetFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), expectedFileName)
-    
+
     val downloadState = activeDownloads[expectedFileName] ?: DownloadInfo()
     var isDownloadedLocal by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(selectedRelease, downloadState.isDownloaded) { 
-        if(expectedFileName.isNotEmpty()) isDownloadedLocal = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), expectedFileName).exists() 
+
+    LaunchedEffect(selectedRelease, downloadState.isDownloaded) {
+        if(expectedFileName.isNotEmpty()) isDownloadedLocal = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), expectedFileName).exists()
     }
-    
+
     BackHandler { onBack() }
     Scaffold(topBar = { TopAppBar(title = { Text(app.name) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } }, actions = {
         IconButton(onClick = { showIssues = true }) { Icon(Icons.Default.BugReport, null) }
@@ -688,13 +838,13 @@ fun AppDetailFullScreen(
             Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState), horizontalAlignment = Alignment.CenterHorizontally) {
                 AsyncImage(model = app.avatarUrl, contentDescription = "Logo", contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).clip(CircleShape))
                 Spacer(modifier = Modifier.height(16.dp)); Text(text = app.name, fontWeight = FontWeight.Bold, fontSize = 28.sp)
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "${t("by", languageSetting)} ${app.owner}", 
-                        color = MaterialTheme.colorScheme.primary, 
-                        fontWeight = FontWeight.Bold, 
-                        fontSize = 16.sp, 
+                        text = "${t("by", languageSetting)} ${app.owner}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .clickable { onOwnerClick(app.owner, app.platform, app.avatarUrl) }
@@ -702,10 +852,10 @@ fun AppDetailFullScreen(
                     )
                     Text(text = " • ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        text = app.platform, 
-                        color = MaterialTheme.colorScheme.primary, 
-                        fontWeight = FontWeight.Bold, 
-                        fontSize = 16.sp, 
+                        text = app.platform,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .clickable { uriHandler.openUri(app.repoUrl) }
@@ -721,33 +871,33 @@ fun AppDetailFullScreen(
                     else {
                         OutlinedButton(onClick = { showVersionSheet = true }, modifier = Modifier.fillMaxWidth().wrapContentHeight(), contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp)) { Text("${selectedRelease!!.version} (${if(selectedRelease!!.isPreRelease) t("pre_release", languageSetting) else t("stable_release", languageSetting)})", fontSize = 16.sp, textAlign = TextAlign.Center) }
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         if (downloadState.isDownloading) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { 
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                                 CircularProgressIndicator(modifier = Modifier.size(36.dp))
-                                Text(downloadState.progress, fontSize = 14.sp) 
+                                Text(downloadState.progress, fontSize = 14.sp)
                             }
                         }
-                        
+
                         if (isDownloadedLocal && !downloadState.isDownloading) {
                             Button(onClick = { installApk(context, targetFile) }, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) { Icon(Icons.Default.Check, null); Spacer(modifier = Modifier.width(8.dp)); Text(t("already_downloaded", languageSetting), fontSize = 16.sp) }
                         } else {
                             Button(
-                                onClick = { 
+                                onClick = {
                                     activeDownloads[expectedFileName] = DownloadInfo(isDownloading = true)
-                                    globalScope.launch { 
-                                        val file = downloadApk(context, expectedFileName, selectedRelease!!.downloadUrl, githubToken, languageSetting) { 
+                                    globalScope.launch {
+                                        val file = downloadApk(context, expectedFileName, selectedRelease!!.downloadUrl, githubToken, languageSetting) {
                                             activeDownloads[expectedFileName] = DownloadInfo(progress = it, isDownloading = true)
                                         }
                                         activeDownloads[expectedFileName] = DownloadInfo(isDownloaded = file != null, isDownloading = false)
-                                    } 
-                                }, 
-                                modifier = Modifier.fillMaxWidth().height(56.dp), 
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
                                 enabled = !downloadState.isDownloading
-                            ) { 
+                            ) {
                                 Icon(Icons.Default.Download, null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (downloadState.isDownloading) t("downloading", languageSetting) else t("download_apk", languageSetting), fontSize = 18.sp) 
+                                Text(if (downloadState.isDownloading) t("downloading", languageSetting) else t("download_apk", languageSetting), fontSize = 18.sp)
                             }
                         }
 
@@ -767,12 +917,12 @@ fun AppDetailFullScreen(
 
     if (showIssues) {
         IssuesScreen(
-            app = app, 
-            githubToken = githubToken, 
-            codebergToken = codebergToken, 
-            languageSetting = languageSetting, 
-            onUserClick = { user, platform, avatar -> 
-                onOwnerClick(user, platform, avatar) 
+            app = app,
+            githubToken = githubToken,
+            codebergToken = codebergToken,
+            languageSetting = languageSetting,
+            onUserClick = { user, platform, avatar ->
+                onOwnerClick(user, platform, avatar)
             },
             onDismiss = { showIssues = false }
         )
@@ -780,22 +930,22 @@ fun AppDetailFullScreen(
 
     if (showVersionSheet && releases != null) {
         ModalBottomSheet(
-            onDismissRequest = { showVersionSheet = false }, 
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), 
-            containerColor = MaterialTheme.colorScheme.surface, 
-            tonalElevation = 8.dp, 
+            onDismissRequest = { showVersionSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp)) {
                     val (stable, pre) = releases!!.partition { !it.isPreRelease }
-                    if (stable.isNotEmpty()) { 
+                    if (stable.isNotEmpty()) {
                         item { Text(t("stable_releases_header", languageSetting), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp)) }
-                        items(stable) { VersionItem(it, it == selectedRelease) { selectedRelease = it; showVersionSheet = false } } 
+                        items(stable) { VersionItem(it, it == selectedRelease) { selectedRelease = it; showVersionSheet = false } }
                     }
-                    if (pre.isNotEmpty()) { 
+                    if (pre.isNotEmpty()) {
                         item { Spacer(modifier = Modifier.height(12.dp)); Text(t("pre_releases_header", languageSetting), color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) }
-                        items(pre) { VersionItem(it, it == selectedRelease) { selectedRelease = it; showVersionSheet = false } } 
+                        items(pre) { VersionItem(it, it == selectedRelease) { selectedRelease = it; showVersionSheet = false } }
                     }
                 }
             }
@@ -845,7 +995,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
     var repairProgressLocal by remember { mutableStateOf("") }
     var currentFileValid by remember { mutableStateOf(true) }
 
-    fun refreshFiles() { val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS); downloadedFiles = dir?.listFiles { _, name -> name.endsWith(".apk") }?.toList() ?: emptyList() }
+    fun refreshFiles() { val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS); downloadedFiles = dir?.listFiles { _, name -> name.endsWith(".apk") && name != "update.apk" }?.toList() ?: emptyList() }
     LaunchedEffect(Unit) { refreshFiles() }
 
     if (selectedFileForDialog != null) {
@@ -856,18 +1006,18 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
         val owner = parts.getOrNull(1) ?: ""
         val appName = parts.getOrNull(2) ?: ""
         val version = parts.getOrNull(3) ?: ""
-        
+
         val downloadState = activeDownloads[fileName] ?: DownloadInfo()
         val isDownloadingGlobal = downloadState.isDownloading
-        
-        LaunchedEffect(file, isDownloadingGlobal) { 
+
+        LaunchedEffect(file, isDownloadingGlobal) {
             if (!isDownloadingGlobal) {
                 currentFileValid = isApkValid(context, file)
             }
         }
         val avatarUrl = when (platform) { "GitHub" -> "https://github.com/$owner.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
         val apkIcon = remember(file) { getApkIcon(context, file) }
-        
+
         AlertDialog(onDismissRequest = { if (!isRepairingLocal) selectedFileForDialog = null }, confirmButton = {}, title = null, text = {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (apkIcon != null) {
@@ -879,7 +1029,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                 }
                 Spacer(modifier = Modifier.height(16.dp)); Text(appName.ifBlank { file.name }, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
                 if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp)) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-                
+
                 if (!currentFileValid && !isDownloadingGlobal) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                         Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(18.dp))
@@ -887,22 +1037,22 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                         Text(t("apk_corrupted", languageSetting), color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-                
+
                 Text("${file.length() / (1024 * 1024)} MB", fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp)); Spacer(modifier = Modifier.height(24.dp))
-                
+
                 if (isRepairingLocal || isDownloadingGlobal) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)))
                     Text(if (isDownloadingGlobal) downloadState.progress else repairProgressLocal, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 } else {
                     Button(onClick = { installApk(context, file); selectedFileForDialog = null }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = if(currentFileValid) MaterialTheme.colorScheme.primary else Color.Gray)) { Icon(Icons.Default.Download, null); Spacer(modifier = Modifier.width(10.dp)); Text(t("install", languageSetting), fontWeight = FontWeight.Bold) }
-                    
+
                     if (!currentFileValid && platform.isNotBlank() && owner.isNotBlank()) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Button(onClick = { 
+                        Button(onClick = {
                             isRepairingLocal = true
                             activeDownloads[fileName] = DownloadInfo(isDownloading = true, progress = t("repairing", languageSetting))
                             globalScope.launch {
-                                val success = repairApk(context, file, platform, owner, appName, version, githubToken, codebergToken, languageSetting) { 
+                                val success = repairApk(context, file, platform, owner, appName, version, githubToken, codebergToken, languageSetting) {
                                     repairProgressLocal = it
                                     activeDownloads[fileName] = DownloadInfo(isDownloading = true, progress = it)
                                 }
@@ -932,7 +1082,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
             val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
             val apkIcon = remember(file) { if (isValid && !isDownloading) getApkIcon(context, file) else null }
             Card(modifier = Modifier.fillMaxWidth().clickable { selectedFileForDialog = file }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) { 
+                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
                     if (apkIcon != null) {
                         AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     } else if (avatarUrl != null) {
@@ -941,14 +1091,14 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                         Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(parts.getOrNull(2) ?: file.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
-                        if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp) }
-                    }
-                    Text(if (isDownloading) activeDownloads[fileName]?.progress ?: "" else "${file.length() / (1024 * 1024)} MB", fontSize = 12.sp, color = Color.Gray) 
-                }; Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
+                Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(parts.getOrNull(2) ?: file.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
+                    if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp) }
+                }
+                Text(if (isDownloading) activeDownloads[fileName]?.progress ?: "" else "${file.length() / (1024 * 1024)} MB", fontSize = 12.sp, color = Color.Gray)
+            }; Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
             } }
         } }
     }
@@ -966,7 +1116,7 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
     var newRepoName by remember { mutableStateOf("") }; var newRepoDesc by remember { mutableStateOf("") }; var isPrivate by remember { mutableStateOf(false) }
     fun refresh() { scope.launch {
         isLoading = true; statusText = if (appsOnly) t("search_apps_hint", languageSetting) else ""
-        if (currentAvatarUrl.isEmpty()) { (if (platform == "GitHub") fetchGitHubProfile(token) else fetchCodebergProfile(token))?.let { currentAvatarUrl = it.avatarUrl } }
+        if (currentAvatarUrl.isEmpty()) { (if (platform == "GitHub") fetchGitHubProfile(token, owner) else fetchCodebergProfile(token, owner))?.let { currentAvatarUrl = it.avatarUrl } }
         val all = if (platform == "GitHub") fetchGitHubReposForOwner(owner, token, isOwnProfile) else fetchCodebergReposForOwner(owner, token, isOwnProfile)
         if (appsOnly) { repos = all.map { repo -> async { if (fetchReleasesForApp(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platform, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = currentAvatarUrl), githubToken, codebergToken).isNotEmpty()) repo else null } }.awaitAll().filterNotNull(); if (repos.isEmpty()) statusText = t("no_apps", languageSetting) } else repos = all
         isLoading = false
@@ -980,29 +1130,29 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
         else if (repos.isEmpty() && statusText.isNotEmpty()) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text(statusText, color = Color.Gray) }
         else LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) { items(repos, key = { it.htmlUrl }) { repo ->
             if (isOwnProfile) {
-                val state = rememberSwipeToDismissBoxState(confirmValueChange = { 
-                    if (it == SwipeToDismissBoxValue.EndToStart) { repoToDelete = repo; false } 
+                val state = rememberSwipeToDismissBoxState(confirmValueChange = {
+                    if (it == SwipeToDismissBoxValue.EndToStart) { repoToDelete = repo; false }
                     else if (it == SwipeToDismissBoxValue.StartToEnd) { repoToRename = repo; renameRepoNameInput = repo.name; false }
-                    else false 
+                    else false
                 })
-                SwipeToDismissBox(state = state, backgroundContent = { 
+                SwipeToDismissBox(state = state, backgroundContent = {
                     val direction = state.dismissDirection
                     val color = when (direction) {
                         SwipeToDismissBoxValue.EndToStart -> Color(0xFFEF5350)
                         SwipeToDismissBoxValue.StartToEnd -> Color(0xFF4CAF50)
                         else -> Color.Transparent
                     }
-                    Box(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(color)) { 
+                    Box(modifier = Modifier.fillMaxSize().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(color)) {
                         if (direction == SwipeToDismissBoxValue.EndToStart) {
-                            Row(modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) { 
-                                Text(t("delete", languageSetting), color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); Icon(Icons.Default.Delete, null, tint = Color.White) 
-                            } 
+                            Row(modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(t("delete", languageSetting), color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); Icon(Icons.Default.Delete, null, tint = Color.White)
+                            }
                         } else if (direction == SwipeToDismissBoxValue.StartToEnd) {
-                            Row(modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) { 
-                                Icon(Icons.Default.Edit, null, tint = Color.White); Spacer(Modifier.width(12.dp)); Text(t("rename", languageSetting), color = Color.White, fontWeight = FontWeight.Bold) 
+                            Row(modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Edit, null, tint = Color.White); Spacer(Modifier.width(12.dp)); Text(t("rename", languageSetting), color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
-                    } 
+                    }
                 }) { RepoCard(repo, languageSetting = languageSetting) { onRepoSelected(repo) } }
             } else RepoCard(repo, languageSetting = languageSetting) { onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platform, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = currentAvatarUrl)) }
             Spacer(Modifier.height(8.dp))
@@ -1016,11 +1166,11 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectFilesScreen(
-    repo: SimpleRepo, 
-    token: String, 
-    platform: String, 
-    onBack: () -> Unit, 
-    onFileClick: (ProjectFile) -> Unit, 
+    repo: SimpleRepo,
+    token: String,
+    platform: String,
+    onBack: () -> Unit,
+    onFileClick: (ProjectFile) -> Unit,
     languageSetting: String,
     selectedBranch: String?,
     onBranchChange: (String) -> Unit
@@ -1028,7 +1178,7 @@ fun ProjectFilesScreen(
     val context = LocalContext.current; val scope = rememberCoroutineScope()
     var currentPath by remember { mutableStateOf("") }
     var files by remember { mutableStateOf<List<ProjectFile>>(emptyList()) }; var isLoading by remember { mutableStateOf(true) }
-    
+
     var branches by remember { mutableStateOf<List<String>>(emptyList()) }
     var showBranchDropdown by remember { mutableStateOf(false) }
 
@@ -1072,20 +1222,20 @@ fun ProjectFilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Column { 
+                title = {
+                    Column {
                         Text(repo.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (currentPath.isNotEmpty()) Text(currentPath, fontSize = 10.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                }, 
-                navigationIcon = { 
-                    IconButton(onClick = { 
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
                         if (currentPath.isEmpty()) onBack()
                         else {
                             val parts = currentPath.split("/")
                             currentPath = if (parts.size <= 1) "" else parts.dropLast(1).joinToString("/")
                         }
-                    }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } 
+                    }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) }
                 },
                 actions = {
                     Box {
@@ -1101,9 +1251,9 @@ fun ProjectFilesScreen(
                             branches.forEach { b ->
                                 DropdownMenuItem(
                                     text = { Text(b) },
-                                    onClick = { 
+                                    onClick = {
                                         onBranchChange(b)
-                                        showBranchDropdown = false 
+                                        showBranchDropdown = false
                                     },
                                     leadingIcon = { Icon(Icons.Default.AccountTree, null, modifier = Modifier.size(18.dp)) }
                                 )
@@ -1111,23 +1261,23 @@ fun ProjectFilesScreen(
                         }
                     }
                 }
-            ) 
-        }, 
+            )
+        },
         floatingActionButton = { FloatingActionButton(onClick = { picker.launch("*/*") }) { Icon(Icons.Default.UploadFile, null) } }
     ) { padding ->
         if (isLoading) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        else LazyColumn(Modifier.fillMaxSize().padding(padding)) { 
-            items(files) { f -> 
+        else LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+            items(files) { f ->
                 ListItem(
-                    headlineContent = { Text(f.name) }, 
-                    leadingContent = { Icon(if (f.type == "dir") Icons.Default.Folder else Icons.Default.Description, null, tint = if (f.type == "dir") Color.Cyan else Color.Gray) }, 
-                    modifier = Modifier.clickable { 
+                    headlineContent = { Text(f.name) },
+                    leadingContent = { Icon(if (f.type == "dir") Icons.Default.Folder else Icons.Default.Description, null, tint = if (f.type == "dir") Color.Cyan else Color.Gray) },
+                    modifier = Modifier.clickable {
                         if (f.type == "dir") currentPath = f.path
-                        else onFileClick(f) 
+                        else onFileClick(f)
                     }
                 )
-                HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f)) 
-            } 
+                HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
+            }
         }
     }
 }
@@ -1139,7 +1289,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
     var text by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
-    
+
     // Theme Colors
     val editorBackground = MaterialTheme.colorScheme.surface
     val gutterBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -1149,7 +1299,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
     val accentColor = MaterialTheme.colorScheme.primary
 
     BackHandler { onBack() }
-    
+
     LaunchedEffect(Unit) {
         text = fetchFileContent(token, repo.owner, repo.name, file.path, platform, branch) ?: ""
         isLoading = false
@@ -1211,7 +1361,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
             val verticalScrollState = rememberScrollState()
             val horizontalScrollState = rememberScrollState()
             val lines = text.lines()
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1272,10 +1422,12 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
 
 val httpClient = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).build()
 
-private suspend fun fetchGitHubProfile(token: String): UserProfile? = withContext(Dispatchers.IO) {
+private suspend fun fetchGitHubProfile(token: String, username: String? = null): UserProfile? = withContext(Dispatchers.IO) {
     try {
-        val req = Request.Builder().url("https://api.github.com/user").addHeader("Authorization", "Bearer $token").build()
-        httpClient.newCall(req).execute().use { resp ->
+        val url = if (username == null) "https://api.github.com/user" else "https://api.github.com/users/$username"
+        val req = Request.Builder().url(url)
+        if (token.isNotBlank()) req.addHeader("Authorization", "Bearer $token")
+        httpClient.newCall(req.build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext null
             val json = JSONObject(resp.body?.string() ?: "")
             UserProfile(json.optString("name", ""), json.getString("login"), json.getString("avatar_url"), json.optString("bio", ""), "GitHub")
@@ -1283,10 +1435,12 @@ private suspend fun fetchGitHubProfile(token: String): UserProfile? = withContex
     } catch (e: Exception) { null }
 }
 
-private suspend fun fetchCodebergProfile(token: String): UserProfile? = withContext(Dispatchers.IO) {
+private suspend fun fetchCodebergProfile(token: String, username: String? = null): UserProfile? = withContext(Dispatchers.IO) {
     try {
-        val req = Request.Builder().url("https://codeberg.org/api/v1/user").addHeader("Authorization", "token $token").addHeader("Accept", "application/json").build()
-        httpClient.newCall(req).execute().use { resp ->
+        val url = if (username == null) "https://codeberg.org/api/v1/user" else "https://codeberg.org/api/v1/users/$username"
+        val req = Request.Builder().url(url).addHeader("Accept", "application/json")
+        if (token.isNotBlank()) req.addHeader("Authorization", "token $token")
+        httpClient.newCall(req.build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext null
             val json = JSONObject(resp.body?.string() ?: "")
             UserProfile(json.optString("full_name", ""), json.getString("login"), json.getString("avatar_url"), json.optString("description", "").ifBlank { json.optString("biography", "") }, "Codeberg")
@@ -1362,11 +1516,11 @@ private suspend fun searchMultiSourceApps(query: String, ghToken: String, cbToke
     val gh = async(Dispatchers.IO) { searchGitHub(query, ghToken) }
     val cb = async(Dispatchers.IO) { searchCodeberg(query, cbToken) }
     val all = (gh.await() + cb.await()).distinctBy { it.id }
-    all.map { app -> 
-        async(Dispatchers.IO) { 
+    all.map { app ->
+        async(Dispatchers.IO) {
             val releases = fetchReleasesForApp(app, ghToken, cbToken)
-            if (releases.isNotEmpty()) app.copy(preFetchedReleases = releases) else null 
-        } 
+            if (releases.isNotEmpty()) app.copy(preFetchedReleases = releases) else null
+        }
     }.awaitAll().filterNotNull()
 }
 
@@ -1447,7 +1601,7 @@ private suspend fun fetchCodebergReleases(owner: String, repo: String, token: St
 private suspend fun fetchAppFromUrl(url: String, ghToken: String, cbToken: String): OpenSourceApp? = withContext(Dispatchers.IO) {
     try {
         if (url.contains("github.com")) {
-            val parts = url.substringAfter("github.com/").split("/")
+            val parts = url.substringAfter("github.com/").split("/").filter { it.isNotBlank() }
             if (parts.size >= 2) {
                 val req = Request.Builder().url("https://api.github.com/repos/${parts[0]}/${parts[1]}")
                 if (ghToken.isNotBlank()) req.addHeader("Authorization", "Bearer $ghToken")
@@ -1455,6 +1609,17 @@ private suspend fun fetchAppFromUrl(url: String, ghToken: String, cbToken: Strin
                     if (!resp.isSuccessful) return@withContext null
                     val json = JSONObject(resp.body?.string() ?: "")
                     return@withContext OpenSourceApp("${parts[0]}/${parts[1]}", json.getString("name"), parts[0], "GitHub", json.optString("description", ""), json.getString("html_url"), json.getJSONObject("owner").getString("avatar_url"))
+                }
+            }
+        } else if (url.contains("codeberg.org")) {
+            val parts = url.substringAfter("codeberg.org/").split("/").filter { it.isNotBlank() }
+            if (parts.size >= 2) {
+                val req = Request.Builder().url("https://codeberg.org/api/v1/repos/${parts[0]}/${parts[1]}")
+                if (cbToken.isNotBlank()) req.addHeader("Authorization", "token $cbToken")
+                httpClient.newCall(req.build()).execute().use { resp ->
+                    if (!resp.isSuccessful) return@withContext null
+                    val json = JSONObject(resp.body?.string() ?: "")
+                    return@withContext OpenSourceApp("${parts[0]}/${parts[1]}", json.getString("name"), parts[0], "Codeberg", json.optString("description", ""), json.getString("html_url"), json.getJSONObject("owner").getString("avatar_url"))
                 }
             }
         }
@@ -1508,7 +1673,7 @@ private suspend fun repairApk(context: Context, file: File, platform: String, ow
         val releases = fetchReleasesForApp(app, ghToken, cbToken)
         val release = releases.find { it.version == version } ?: return@withContext false
         val url = release.downloadUrl
-        
+
         val currentSize = file.length()
         val req = Request.Builder().url(url).addHeader("Range", "bytes=$currentSize-")
         val token = if (platform == "GitHub") ghToken else cbToken
@@ -1516,7 +1681,7 @@ private suspend fun repairApk(context: Context, file: File, platform: String, ow
             val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
             req.addHeader("Authorization", authHeader)
         }
-        
+
         httpClient.newCall(req.build()).execute().use { resp ->
             if (resp.code == 416) return@withContext isApkValid(context, file)
             if (!resp.isSuccessful) return@withContext false
@@ -1653,7 +1818,7 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
         }
 
         if (showCreateIssue) {
-            CreateIssueDialog(app = app, token = token, languageSetting = languageSetting, onDismiss = { newIssue -> 
+            CreateIssueDialog(app = app, token = token, languageSetting = languageSetting, onDismiss = { newIssue ->
                 showCreateIssue = false
                 if (newIssue != null) refresh(newIssue) else refresh()
             })
@@ -1706,9 +1871,9 @@ private fun parseMarkdown(text: String): androidx.compose.ui.text.AnnotatedStrin
         val italicRegex = "(?<!\\*)\\*(?!\\*)(.*?)(?<!\\*)\\*(?!\\*)".toRegex()
 
         var lastIdx = 0
-        val matches = (boldRegex.findAll(text).map { it to "bold" } + 
-                       italicRegex.findAll(text).map { it to "italic" })
-                      .sortedBy { it.first.range.first }
+        val matches = (boldRegex.findAll(text).map { it to "bold" } +
+                italicRegex.findAll(text).map { it to "italic" })
+            .sortedBy { it.first.range.first }
 
         matches.forEach { (match, type) ->
             if (match.range.first >= lastIdx) {
@@ -1735,9 +1900,9 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
     var isLoading by remember { mutableStateOf(true) }
     var commentText by remember { mutableStateOf("") }
     val myProfile = remember { mutableStateOf<UserProfile?>(null) }
-    
+
     var uploadingImage by remember { mutableStateOf(false) }
-    
+
     var showDeleteIssueConfirm by remember { mutableStateOf(false) }
     var commentToDelete by remember { mutableStateOf<IssueComment?>(null) }
 
@@ -1750,9 +1915,9 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
                     val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                     val fileName = "issue_img_${System.currentTimeMillis()}.png"
                     if (uploadFileToPlatform(token, app.owner, app.name, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
-                        val rawUrl = if (app.platform == "GitHub") 
+                        val rawUrl = if (app.platform == "GitHub")
                             "https://raw.githubusercontent.com/${app.owner}/${app.name}/HEAD/.opi_store/uploads/$fileName"
-                        else 
+                        else
                             "https://codeberg.org/${app.owner}/${app.name}/raw/branch/main/.opi_store/uploads/$fileName"
                         commentText += "\n![]($rawUrl)\n"
                     }
@@ -1773,13 +1938,13 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
             onDismissRequest = { showDeleteIssueConfirm = false },
             title = { Text(t("delete_issue_title", languageSetting)) },
             text = { Text(t("delete_issue_confirm", languageSetting)) },
-            confirmButton = { 
-                Button(onClick = { 
-                    scope.launch { 
-                        if (deleteIssue(token, app.owner, app.name, app.platform, issue)) onBack() 
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch {
+                        if (deleteIssue(token, app.owner, app.name, app.platform, issue)) onBack()
                         showDeleteIssueConfirm = false
-                    } 
-                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) } 
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) }
             },
             dismissButton = { TextButton(onClick = { showDeleteIssueConfirm = false }) { Text(t("cancel", languageSetting)) } }
         )
@@ -1790,15 +1955,15 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
             onDismissRequest = { commentToDelete = null },
             title = { Text(t("delete_comment_title", languageSetting)) },
             text = { Text(t("delete_comment_confirm", languageSetting)) },
-            confirmButton = { 
-                Button(onClick = { 
-                    scope.launch { 
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch {
                         if (deleteComment(token, app.owner, app.name, app.platform, commentToDelete!!.id)) {
                             comments = fetchIssueComments(token, app.owner, app.name, app.platform, issue.number, myProfile.value?.login)
                         }
                         commentToDelete = null
-                    } 
-                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) } 
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) }
             },
             dismissButton = { TextButton(onClick = { commentToDelete = null }) { Text(t("cancel", languageSetting)) } }
         )
@@ -1806,16 +1971,16 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
 
     Dialog(onDismissRequest = onBack, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
-            topBar = { 
+            topBar = {
                 TopAppBar(
-                    title = { Text("#${issue.number}") }, 
+                    title = { Text("#${issue.number}") },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
                     actions = {
                         if (issue.user == myProfile.value?.login) {
                             IconButton(onClick = { showDeleteIssueConfirm = true }) { Icon(Icons.Default.Delete, null, tint = Color.Red) }
                         }
                     }
-                ) 
+                )
             },
             bottomBar = {
                 Surface(tonalElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
@@ -1847,19 +2012,19 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 AsyncImage(
-                                    model = issue.userAvatar, 
-                                    contentDescription = null, 
+                                    model = issue.userAvatar,
+                                    contentDescription = null,
                                     modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onUserClick(issue.user, app.platform, issue.userAvatar) }
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Column { 
+                                Column {
                                     Text(
-                                        text = issue.user, 
-                                        fontWeight = FontWeight.Bold, 
+                                        text = issue.user,
+                                        fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         modifier = Modifier.clickable { onUserClick(issue.user, app.platform, issue.userAvatar) }
                                     )
-                                    Text(if (issue.state == "open") t("open", languageSetting) else t("closed", languageSetting), color = if (issue.state == "open") Color(0xFF4CAF50) else Color(0xFFE57373), fontSize = 11.sp, fontWeight = FontWeight.Bold) 
+                                    Text(if (issue.state == "open") t("open", languageSetting) else t("closed", languageSetting), color = if (issue.state == "open") Color(0xFF4CAF50) else Color(0xFFE57373), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp)); Text(issue.title, fontSize = 19.sp, fontWeight = FontWeight.Black)
@@ -1874,17 +2039,17 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
                     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
                         Row(Modifier.padding(8.dp)) {
                             AsyncImage(
-                                model = comment.userAvatar, 
-                                contentDescription = null, 
+                                model = comment.userAvatar,
+                                contentDescription = null,
                                 modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) }
                             )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) { 
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = comment.user, 
-                                        fontWeight = FontWeight.Bold, 
-                                        fontSize = 13.sp, 
+                                        text = comment.user,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
                                         modifier = Modifier.weight(1f).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) }
                                     )
                                     if (comment.user == myProfile.value?.login) {
@@ -1945,9 +2110,9 @@ fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String
                     val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                     val fileName = "issue_img_${System.currentTimeMillis()}.png"
                     if (uploadFileToPlatform(token, app.owner, app.name, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
-                        val rawUrl = if (app.platform == "GitHub") 
+                        val rawUrl = if (app.platform == "GitHub")
                             "https://raw.githubusercontent.com/${app.owner}/${app.name}/HEAD/.opi_store/uploads/$fileName"
-                        else 
+                        else
                             "https://codeberg.org/${app.owner}/${app.name}/raw/branch/main/.opi_store/uploads/$fileName"
                         body += "\n![]($rawUrl)\n"
                     }
@@ -1965,7 +2130,7 @@ fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(t("title", languageSetting)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
-                
+
                 OutlinedTextField(value = body, onValueChange = { body = it }, label = { Text(t("body", languageSetting)) }, modifier = Modifier.fillMaxWidth(), minLines = 4)
                 Spacer(Modifier.height(12.dp))
 
@@ -2014,18 +2179,18 @@ private suspend fun fetchIssueComments(token: String, owner: String, repo: Strin
     try {
         val auth = if (platform == "GitHub") "Bearer $token" else "token $token"
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/issues/comments" else "https://codeberg.org/api/v1/repos/$owner/$repo/issues/$number/comments"
-        // For GitHub, the structure is slightly different if we want reactions per comment. 
+        // For GitHub, the structure is slightly different if we want reactions per comment.
         // We'll use the issue-specific comment URL.
         val targetUrl = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/issues/$number/comments" else url
-        
+
         httpClient.newCall(Request.Builder().url(targetUrl).addHeader("Authorization", auth).build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext list
             val arr = JSONArray(resp.body?.string() ?: "[]")
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); val user = obj.getJSONObject("user")
                 val reactions = if (obj.has("reactions")) obj.getJSONObject("reactions").optInt("total_count", 0) else 0
-                
-                // For GitHub, we can fetch reactions to see if "I" liked it. 
+
+                // For GitHub, we can fetch reactions to see if "I" liked it.
                 // Simplified: we only check if the current user has a reaction ID.
                 var myReactionId: String? = null
                 if (platform == "GitHub" && myLogin != null) {
@@ -2043,7 +2208,7 @@ private suspend fun fetchIssueComments(token: String, owner: String, repo: Strin
                         }
                     }
                 }
-                
+
                 list.add(IssueComment(obj.getString("id"), obj.getString("body"), user.getString("login"), user.getString("avatar_url"), reactions, myReactionId))
             }
         }
@@ -2140,7 +2305,7 @@ private suspend fun fetchFilesFromPlatform(token: String, owner: String, repo: S
         val baseUrl = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents"
         var url = if (path.isEmpty()) baseUrl else "$baseUrl/$path"
         if (branch != null) url += "?ref=$branch"
-        
+
         httpClient.newCall(Request.Builder().url(url).addHeader("Authorization", authHeader).build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext emptyList()
             val arr = JSONArray(resp.body?.string() ?: "[]")
@@ -2166,7 +2331,7 @@ private suspend fun updateFileOnPlatform(token: String, owner: String, repo: Str
     try {
         val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents/$path" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents/$path"
-        val bodyObj = JSONObject().apply { 
+        val bodyObj = JSONObject().apply {
             put("message", t("edit_via_app", languageSetting))
             put("content", Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP))
             put("sha", sha)
@@ -2181,7 +2346,7 @@ private suspend fun uploadFileToPlatform(token: String, owner: String, repo: Str
     try {
         val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/contents/$path" else "https://codeberg.org/api/v1/repos/$owner/$repo/contents/$path"
-        val bodyObj = JSONObject().apply { 
+        val bodyObj = JSONObject().apply {
             put("message", t("upload_via_app", languageSetting))
             put("content", content)
             if (branch != null) put("branch", branch)
@@ -2218,4 +2383,202 @@ private suspend fun renameCodebergRepo(token: String, owner: String, oldName: St
         val body = JSONObject().apply { put("name", newName) }.toString().toRequestBody("application/json".toMediaType())
         httpClient.newCall(Request.Builder().url("https://codeberg.org/api/v1/repos/$owner/$oldName").patch(body).addHeader("Authorization", "token $token").build()).execute().use { it.isSuccessful }
     } catch (e: Exception) { false }
+}
+
+@Composable
+fun UpdateScreen(
+    currentVersion: String,
+    newVersion: String,
+    changelog: String,
+    downloadUrl: String,
+    onCancel: () -> Unit,
+    languageSetting: String,
+    context: android.content.Context,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf("") }
+    var downloadedFile by remember { mutableStateOf<java.io.File?>(null) }
+
+    BackHandler(onBack = onCancel)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .systemBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 20.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Update,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = t("update_available", languageSetting),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${t("current_version", languageSetting)}: $currentVersion",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${t("new_version", languageSetting)}: $newVersion",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Changelog
+            if (changelog.isNotBlank()) {
+                Text(
+                    t("changelog_title", languageSetting),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                        .padding(12.dp)
+                ) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        MarkdownBody(changelog)
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Buttons
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (isDownloading) {
+                    Text(
+                        text = downloadProgress,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().height(10.dp).clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                } else {
+                    val isDownloaded = downloadedFile != null
+                    Button(
+                        onClick = {
+                            if (isDownloaded) {
+                                installApk(context, downloadedFile!!)
+                            } else {
+                                isDownloading = true
+                                scope.launch {
+                                    val file = downloadApk(context, "update.apk", downloadUrl, "", languageSetting) { downloadProgress = it }
+                                    if (file != null) {
+                                        downloadedFile = file
+                                        installApk(context, file)
+                                    }
+                                    isDownloading = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(72.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Icon(if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download, null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = if (isDownloaded) t("install", languageSetting) else t("update_now", languageSetting),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TextButton(
+                        onClick = onCancel,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = t("later", languageSetting),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private suspend fun checkAppUpdate(): AppRelease? = withContext(Dispatchers.IO) {
+    try {
+        val url = "https://api.github.com/repos/DigitalTechLab/Opi-Store/releases/latest"
+        httpClient.newCall(Request.Builder().url(url).addHeader("User-Agent", "OpiStore").build()).execute().use { resp ->
+            if (!resp.isSuccessful) return@withContext null
+            val obj = org.json.JSONObject(resp.body?.string() ?: "")
+            val tag = obj.getString("tag_name")
+            val assets = obj.getJSONArray("assets")
+            var downloadUrl = ""
+            for (i in 0 until assets.length()) {
+                val asset = assets.getJSONObject(i)
+                if (asset.getString("name").endsWith(".apk")) {
+                    downloadUrl = asset.getString("browser_download_url")
+                    break
+                }
+            }
+            if (downloadUrl.isNotEmpty()) {
+                AppRelease(tag, downloadUrl, obj.optBoolean("prerelease", false), obj.optString("body", ""))
+            } else null
+        }
+    } catch (e: Exception) { null }
+}
+
+private fun isNewerVersion(current: String, latest: String): Boolean {
+    val curClean = current.replace(Regex("[^0-9.]"), "")
+    val latClean = latest.replace(Regex("[^0-9.]"), "")
+    val curParts = curClean.split(".").mapNotNull { it.toIntOrNull() }
+    val latParts = latClean.split(".").mapNotNull { it.toIntOrNull() }
+    for (i in 0 until maxOf(curParts.size, latParts.size)) {
+        val cur = curParts.getOrElse(i) { 0 }
+        val lat = latParts.getOrElse(i) { 0 }
+        if (lat > cur) return true
+        if (cur > lat) return false
+    }
+    return false
 }
