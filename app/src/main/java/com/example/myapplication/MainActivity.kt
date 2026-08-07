@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
@@ -73,7 +74,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 // --- DATENMODELLE ---
-data class AppRelease(val version: String, val downloadUrl: String, val isPreRelease: Boolean, val body: String = "")
+data class AppRelease(val version: String, val downloadUrl: String, val isPreRelease: Boolean, val body: String = "", val downloadCount: Int = 0)
 data class OpenSourceApp(
     val id: String, val name: String, val owner: String, val platform: String,
     val description: String, val repoUrl: String, val avatarUrl: String,
@@ -85,6 +86,7 @@ data class ProjectFile(val name: String, val path: String, val type: String, val
 data class DownloadInfo(val progress: String = "", val isDownloading: Boolean = false, val isDownloaded: Boolean = false)
 data class Issue(val id: String, val number: Int, val title: String, val body: String, val state: String, val user: String, val userAvatar: String, val comments: Int, val nodeId: String? = null)
 data class IssueComment(val id: String, val body: String, val user: String, val userAvatar: String, val reactions: Int, val myReactionId: String? = null)
+data class RepoStats(val stars: Int, val forks: Int, val watchers: Int, val language: String, val createdAt: String)
 
 private fun t(key: String, lang: String): String {
     val isDe = lang == "de"
@@ -205,6 +207,13 @@ private fun t(key: String, lang: String): String {
         "off" -> if (isDe) "Aus" else "Off"
         "later" -> if (isDe) "Vielleicht später" else "Maybe later"
         "changelog_title" -> if (isDe) "Was ist neu?" else "What's new?"
+        "repo_stats" -> if (isDe) "Repository Statistiken" else "Repository Statistics"
+        "stars" -> if (isDe) "Sterne" else "Stars"
+        "forks" -> if (isDe) "Forks" else "Forks"
+        "watchers" -> if (isDe) "Beobachter" else "Watchers"
+        "created_at" -> if (isDe) "Erstellt am" else "Created at"
+        "total_downloads" -> if (isDe) "Gesamte Downloads" else "Total downloads"
+        "downloads_per_version" -> if (isDe) "Downloads pro Version" else "Downloads per version"
         else -> key
     }
 }
@@ -805,6 +814,7 @@ fun AppDetailFullScreen(
     var selectedRelease by remember { mutableStateOf<AppRelease?>(null) }; var showVersionSheet by remember { mutableStateOf(false) }
 
     var showIssues by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
 
     LaunchedEffect(app) {
         if (app.preFetchedReleases != null) {
@@ -832,6 +842,7 @@ fun AppDetailFullScreen(
 
     BackHandler { onBack() }
     Scaffold(topBar = { TopAppBar(title = { Text(app.name) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } }, actions = {
+        IconButton(onClick = { showStats = true }) { Icon(Icons.Default.Info, null) }
         IconButton(onClick = { showIssues = true }) { Icon(Icons.Default.BugReport, null) }
     }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp, vertical = 16.dp)) {
@@ -928,6 +939,16 @@ fun AppDetailFullScreen(
         )
     }
 
+    if (showStats) {
+        RepoStatsScreen(
+            app = app,
+            githubToken = githubToken,
+            codebergToken = codebergToken,
+            languageSetting = languageSetting,
+            onDismiss = { showStats = false }
+        )
+    }
+
     if (showVersionSheet && releases != null) {
         ModalBottomSheet(
             onDismissRequest = { showVersionSheet = false },
@@ -986,6 +1007,7 @@ fun VersionItem(release: AppRelease, isSelected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting: String, activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope) {
     val context = LocalContext.current
@@ -1425,7 +1447,7 @@ val httpClient = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).rea
 private suspend fun fetchGitHubProfile(token: String, username: String? = null): UserProfile? = withContext(Dispatchers.IO) {
     try {
         val url = if (username == null) "https://api.github.com/user" else "https://api.github.com/users/$username"
-        val req = Request.Builder().url(url)
+        val req = Request.Builder().url(url).addHeader("User-Agent", "OpiStore")
         if (token.isNotBlank()) req.addHeader("Authorization", "Bearer $token")
         httpClient.newCall(req.build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext null
@@ -1438,7 +1460,7 @@ private suspend fun fetchGitHubProfile(token: String, username: String? = null):
 private suspend fun fetchCodebergProfile(token: String, username: String? = null): UserProfile? = withContext(Dispatchers.IO) {
     try {
         val url = if (username == null) "https://codeberg.org/api/v1/user" else "https://codeberg.org/api/v1/users/$username"
-        val req = Request.Builder().url(url).addHeader("Accept", "application/json")
+        val req = Request.Builder().url(url).addHeader("Accept", "application/json").addHeader("User-Agent", "OpiStore")
         if (token.isNotBlank()) req.addHeader("Authorization", "token $token")
         httpClient.newCall(req.build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext null
@@ -1560,6 +1582,27 @@ private suspend fun fetchReleasesForApp(app: OpenSourceApp, ghToken: String, cbT
     if (app.platform == "GitHub") fetchGitHubReleases(app.owner, app.name, ghToken) else fetchCodebergReleases(app.owner, app.name, cbToken)
 }
 
+private suspend fun fetchRepoStats(app: OpenSourceApp, token: String): RepoStats? = withContext(Dispatchers.IO) {
+    try {
+        val ownerEnc = java.net.URLEncoder.encode(app.owner, "UTF-8")
+        val nameEnc = java.net.URLEncoder.encode(app.name, "UTF-8")
+        val url = if (app.platform == "GitHub") "https://api.github.com/repos/$ownerEnc/$nameEnc" else "https://codeberg.org/api/v1/repos/$ownerEnc/$nameEnc"
+        val req = Request.Builder().url(url).addHeader("User-Agent", "OpiStore")
+        if (token.isNotBlank()) req.addHeader("Authorization", if (app.platform == "GitHub") "Bearer $token" else "token $token")
+        httpClient.newCall(req.build()).execute().use { resp ->
+            if (!resp.isSuccessful) return@withContext null
+            val json = JSONObject(resp.body?.string() ?: "")
+            RepoStats(
+                stars = json.optInt(if (app.platform == "GitHub") "stargazers_count" else "stars_count", 0),
+                forks = json.optInt("forks_count", 0),
+                watchers = json.optInt(if (app.platform == "GitHub") "subscribers_count" else "watchers_count", 0),
+                language = json.optString("language", "Unknown"),
+                createdAt = json.optString("created_at", "")
+            )
+        }
+    } catch (e: Exception) { null }
+}
+
 private suspend fun fetchGitHubReleases(owner: String, repo: String, token: String): List<AppRelease> = withContext(Dispatchers.IO) {
     val list = mutableListOf<AppRelease>()
     try {
@@ -1571,7 +1614,7 @@ private suspend fun fetchGitHubReleases(owner: String, repo: String, token: Stri
                 val rel = arr.getJSONObject(i); val assets = rel.optJSONArray("assets") ?: continue
                 for (a in 0 until assets.length()) {
                     val asset = assets.getJSONObject(a)
-                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"), rel.optString("body", ""))) }
+                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"), rel.optString("body", ""), asset.optInt("download_count", 0))) }
                 }
             }
         }
@@ -1590,7 +1633,7 @@ private suspend fun fetchCodebergReleases(owner: String, repo: String, token: St
                 val rel = arr.getJSONObject(i); val assets = rel.optJSONArray("assets") ?: continue
                 for (a in 0 until assets.length()) {
                     val asset = assets.getJSONObject(a)
-                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"), rel.optString("body", ""))) }
+                    if (asset.getString("name").endsWith(".apk")) { list.add(AppRelease(rel.getString("tag_name"), asset.getString("browser_download_url"), rel.getBoolean("prerelease"), rel.optString("body", ""), asset.optInt("download_count", 0))) }
                 }
             }
         }
@@ -1825,6 +1868,106 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RepoStatsScreen(app: OpenSourceApp, githubToken: String, codebergToken: String, languageSetting: String, onDismiss: () -> Unit) {
+    var stats by remember { mutableStateOf<RepoStats?>(null) }
+    var releases by remember { mutableStateOf<List<AppRelease>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    val token = if (app.platform == "GitHub") githubToken else codebergToken
+
+    LaunchedEffect(Unit) {
+        val s = fetchRepoStats(app, token)
+        val r = fetchReleasesForApp(app, githubToken, codebergToken)
+        stats = s
+        releases = r
+        isLoading = false
+    }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(t("repo_stats", languageSetting)) },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) } }
+                )
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+                else {
+                    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+                        if (stats != null) {
+                            item {
+                                Spacer(Modifier.height(16.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    StatsCard(t("stars", languageSetting), stats!!.stars.toString(), Icons.Default.Star, Color(0xFFFFD700), Modifier.weight(1f))
+                                    StatsCard(t("forks", languageSetting), stats!!.forks.toString(), Icons.Default.AccountTree, Color(0xFF607D8B), Modifier.weight(1f))
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    StatsCard(t("watchers", languageSetting), stats!!.watchers.toString(), Icons.Default.Visibility, Color(0xFF2196F3), Modifier.weight(1f))
+                                    StatsCard(t("language", languageSetting), stats!!.language, Icons.Default.Code, Color(0xFF4CAF50), Modifier.weight(1f))
+                                }
+                                Spacer(Modifier.height(32.dp))
+                            }
+                        }
+
+                        if (releases.isNotEmpty()) {
+                            val totalDownloads = releases.sumOf { it.downloadCount }
+                            item {
+                                Text(t("total_downloads", languageSetting), fontWeight = FontWeight.Black, fontSize = 22.sp)
+                                Text("$totalDownloads", fontSize = 42.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(24.dp))
+                                Text(t("downloads_per_version", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Spacer(Modifier.height(12.dp))
+                            }
+                            items(releases) { release ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(release.version, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text(if (release.isPreRelease) t("pre_release", languageSetting) else t("stable_release", languageSetting), fontSize = 12.sp, color = Color.Gray)
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("${release.downloadCount}", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                }
+                            }
+                            item { Spacer(Modifier.height(32.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatsCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Black)
+            Text(label, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
 
 @Composable
 fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
