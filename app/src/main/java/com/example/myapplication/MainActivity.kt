@@ -86,6 +86,7 @@ data class ProjectFile(val name: String, val path: String, val type: String, val
 data class DownloadInfo(val progress: String = "", val isDownloading: Boolean = false, val isDownloaded: Boolean = false)
 data class Issue(val id: String, val number: Int, val title: String, val body: String, val state: String, val user: String, val userAvatar: String, val comments: Int, val nodeId: String? = null)
 data class IssueComment(val id: String, val body: String, val user: String, val userAvatar: String, val reactions: Int, val myReactionId: String? = null)
+data class PullRequest(val id: String, val number: Int, val title: String, val body: String, val state: String, val user: String, val userAvatar: String, val comments: Int, val createdAt: String, val headLabel: String? = null)
 data class RepoStats(val stars: Int, val forks: Int, val watchers: Int, val language: String, val createdAt: String)
 
 private fun t(key: String, lang: String): String {
@@ -147,7 +148,8 @@ private fun t(key: String, lang: String): String {
         "cancel" -> if (isDe) "Abbrechen" else "Cancel"
         "tap_to_edit" -> if (isDe) "Name/Bio tippen zum Bearbeiten" else "Tap Name/Bio to edit"
         "change_token" -> if (isDe) "Token ändern" else "Change token"
-        "my_repositories" -> if (isDe) "Deine Repositories" else "Your Repositories"
+        "my_repositories" -> if (isDe) "Meine Repositories" else "My Repositories"
+        "my_repository_editor" -> if (isDe) "Mein Repository Editor" else "My Repository Editor"
         "starred" -> if (isDe) "Markiert (Starred)" else "Starred"
         "login_title" -> if (isDe) "Login" else "Login"
         "personal_access_token" -> if (isDe) "Personal Access Token" else "Personal Access Token"
@@ -214,6 +216,14 @@ private fun t(key: String, lang: String): String {
         "created_at" -> if (isDe) "Erstellt am" else "Created at"
         "total_downloads" -> if (isDe) "Gesamte Downloads" else "Total downloads"
         "downloads_per_version" -> if (isDe) "Downloads pro Version" else "Downloads per version"
+        "pull_requests" -> if (isDe) "Pull Requests" else "Pull Requests"
+        "select_action" -> if (isDe) "Aktion auswählen" else "Select action"
+        "editor" -> if (isDe) "Editor" else "Editor"
+        "merge" -> if (isDe) "Mergen" else "Merge"
+        "merge_confirm" -> if (isDe) "Möchtest du diesen Pull Request wirklich mergen? Die Änderungen werden in den Code übernommen." else "Do you really want to merge this pull request? The changes will be applied to the code."
+        "yes_merge" -> if (isDe) "Ja, Mergen" else "Yes, merge"
+        "no_pull_requests" -> if (isDe) "Keine Pull Requests gefunden." else "No pull requests found."
+        "merged" -> if (isDe) "Gemerged" else "Merged"
         else -> key
     }
 }
@@ -282,6 +292,7 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
     var fullRepoListAvatarUrl by remember { mutableStateOf("") }
     var isViewingOwnProfile by remember { mutableStateOf(false) }
     var selectedRepoForFiles by remember { mutableStateOf<SimpleRepo?>(null) }
+    var selectedRepoForPRs by remember { mutableStateOf<SimpleRepo?>(null) }
     var selectedFileForEdit by remember { mutableStateOf<ProjectFile?>(null) }
     var selectedBranch by remember { mutableStateOf<String?>(null) }
 
@@ -300,12 +311,29 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
             context = context,
             scope = scope
         )
-    } else if (selectedFileForEdit != null && selectedRepoForFiles != null) {
+    } else    if (selectedFileForEdit != null && selectedRepoForFiles != null) {
         CodeEditorScreen(repo = selectedRepoForFiles!!, file = selectedFileForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedFileForEdit = null }, languageSetting = languageSetting, branch = selectedBranch)
+    } else if (selectedRepoForPRs != null) {
+        PullRequestsScreen(app = OpenSourceApp(id = "${selectedRepoForPRs!!.owner}/${selectedRepoForPRs!!.name}", name = selectedRepoForPRs!!.name, owner = selectedRepoForPRs!!.owner, platform = fullRepoListPlatform, description = selectedRepoForPRs!!.description, repoUrl = selectedRepoForPRs!!.htmlUrl, avatarUrl = ""), githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, onUserClick = { user, plat, avatar -> showFullRepoListForUser = user; fullRepoListPlatform = plat; fullRepoListAvatarUrl = avatar; fullRepoListAppsOnly = true; isViewingOwnProfile = false; selectedRepoForPRs = null }, onDismiss = { selectedRepoForPRs = null })
     } else if (selectedRepoForFiles != null) {
         ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null; selectedBranch = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting, selectedBranch = selectedBranch, onBranchChange = { selectedBranch = it })
     } else if (showFullRepoListForUser != null) {
-        FullRepoListScreen(owner = showFullRepoListForUser!!, title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else t("my_repositories", languageSetting), token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, appsOnly = fullRepoListAppsOnly, isOwnProfile = isViewingOwnProfile, ownerAvatarUrl = fullRepoListAvatarUrl, onBack = { showFullRepoListForUser = null }, onAppSelected = { showFullRepoListForUser = null; selectedAppForDetail = it }, onRepoSelected = { selectedBranch = it.defaultBranch; selectedRepoForFiles = it }, githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting)
+        FullRepoListScreen(
+            owner = showFullRepoListForUser!!,
+            title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else if (isViewingOwnProfile) t("my_repository_editor", languageSetting) else t("my_repositories", languageSetting),
+            token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken,
+            platform = fullRepoListPlatform,
+            appsOnly = fullRepoListAppsOnly,
+            isOwnProfile = isViewingOwnProfile,
+            ownerAvatarUrl = fullRepoListAvatarUrl,
+            onBack = { showFullRepoListForUser = null },
+            onAppSelected = { showFullRepoListForUser = null; selectedAppForDetail = it },
+            onRepoSelected = { selectedBranch = it.defaultBranch; selectedRepoForFiles = it },
+            onRepoSelectedPR = { selectedRepoForPRs = it },
+            githubToken = githubToken,
+            codebergToken = codebergToken,
+            languageSetting = languageSetting
+        )
     } else if (selectedAppForDetail != null) {
         AppDetailFullScreen(
             app = selectedAppForDetail!!,
@@ -355,7 +383,23 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
                         languageSetting = languageSetting
                     )
                     1 -> ApkManagerScreen(githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, activeDownloads = activeDownloads, globalScope = scope)
-                    2 -> AccountMultiScreen(githubToken = githubToken, codebergToken = codebergToken, onGithubTokenSaved = { t -> githubToken = t; sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply() }, onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() }, onUsernameClick = { login -> fullRepoListPlatform = if (sharedPrefs.getString("LAST_PLATFORM", "GitHub") == "GitHub") "GitHub" else "Codeberg"; fullRepoListAppsOnly = false; fullRepoListAvatarUrl = ""; isViewingOwnProfile = true; showFullRepoListForUser = login }, languageSetting = languageSetting, onAppSelected = { selectedAppForDetail = it })
+                    2 -> AccountMultiScreen(
+                        githubToken = githubToken,
+                        codebergToken = codebergToken,
+                        onGithubTokenSaved = { t -> githubToken = t; sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply() },
+                        onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() },
+                        initialPlatform = fullRepoListPlatform,
+                        onPlatformChange = { fullRepoListPlatform = it },
+                        onUsernameClick = { login, platform ->
+                            fullRepoListPlatform = platform
+                            fullRepoListAppsOnly = false
+                            fullRepoListAvatarUrl = ""
+                            isViewingOwnProfile = true
+                            showFullRepoListForUser = login
+                        },
+                        languageSetting = languageSetting,
+                        onAppSelected = { selectedAppForDetail = it }
+                    )
                     3 -> SettingsScreen(
                         currentTheme = themeSetting.value,
                         onThemeChange = { themeSetting.value = it; sharedPrefs.edit().putString("THEME_SETTING", it).apply() },
@@ -549,18 +593,18 @@ fun SettingsScreen(
 }
 
 @Composable
-fun AccountMultiScreen(githubToken: String, codebergToken: String, onGithubTokenSaved: (String) -> Unit, onCodebergTokenSaved: (String) -> Unit, onUsernameClick: (String) -> Unit, languageSetting: String, onAppSelected: (OpenSourceApp) -> Unit) {
-    var selectedPlatform by remember { mutableIntStateOf(0) }
+fun AccountMultiScreen(githubToken: String, codebergToken: String, onGithubTokenSaved: (String) -> Unit, onCodebergTokenSaved: (String) -> Unit, initialPlatform: String, onPlatformChange: (String) -> Unit, onUsernameClick: (String, String) -> Unit, languageSetting: String, onAppSelected: (OpenSourceApp) -> Unit) {
+    var selectedPlatform by remember { mutableIntStateOf(if (initialPlatform == "Codeberg") 1 else 0) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).height(48.dp), horizontalArrangement = Arrangement.Center) {
             val ghSelected = selectedPlatform == 0
-            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp), color = if (ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 0 }) {
+            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp), color = if (ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 0; onPlatformChange("GitHub") }) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(model = "https://github.com/fluidicon.png", contentDescription = null, modifier = Modifier.size(20.dp).clip(CircleShape))
                     Spacer(modifier = Modifier.width(8.dp)); Text("GitHub", fontWeight = FontWeight.Bold, color = if (ghSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
                 }
             }
-            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp), color = if (!ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 1 }) {
+            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp), color = if (!ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 1; onPlatformChange("Codeberg") }) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(model = "https://codeberg.org/assets/img/logo.png", contentDescription = null, modifier = Modifier.size(20.dp).clip(CircleShape))
                     Spacer(modifier = Modifier.width(8.dp)); Text("Codeberg", fontWeight = FontWeight.Bold, color = if (!ghSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
@@ -578,7 +622,7 @@ fun AccountMultiScreen(githubToken: String, codebergToken: String, onGithubToken
 }
 
 @Composable
-fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (String) -> Unit, fetchProfile: suspend (String) -> UserProfile?, fetchRepos: suspend (String) -> List<SimpleRepo>, fetchStarred: suspend (String) -> List<SimpleRepo>, updateProfile: suspend (String, String, String) -> Boolean, onUsernameClick: (String) -> Unit, languageSetting: String, onAppSelected: (OpenSourceApp) -> Unit) {
+fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (String) -> Unit, fetchProfile: suspend (String) -> UserProfile?, fetchRepos: suspend (String) -> List<SimpleRepo>, fetchStarred: suspend (String) -> List<SimpleRepo>, updateProfile: suspend (String, String, String) -> Boolean, onUsernameClick: (String, String) -> Unit, languageSetting: String, onAppSelected: (OpenSourceApp) -> Unit) {
     val scope = rememberCoroutineScope()
     var tokenInput by remember { mutableStateOf(token) }
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -625,7 +669,7 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
                 Spacer(modifier = Modifier.height(8.dp)); AsyncImage(model = userProfile!!.avatarUrl, contentDescription = "Avatar", modifier = Modifier.size(100.dp).clip(CircleShape)); Spacer(modifier = Modifier.height(12.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
                     Text(userProfile!!.name.ifBlank { userProfile!!.login }, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { editNameInput = userProfile!!.name.ifBlank { userProfile!!.login }; editBioInput = userProfile!!.bio; showEditProfileDialog = true }.padding(horizontal = 4.dp))
-                    Text("@${userProfile!!.login}", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onUsernameClick(userProfile!!.login) }.padding(horizontal = 4.dp))
+                    Text("@${userProfile!!.login}", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onUsernameClick(userProfile!!.login, platformName) }.padding(horizontal = 4.dp))
                     if (userProfile!!.bio.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -1128,7 +1172,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FullRepoListScreen(owner: String, title: String, token: String, platform: String, appsOnly: Boolean = false, isOwnProfile: Boolean = false, ownerAvatarUrl: String = "", onBack: () -> Unit, onAppSelected: (OpenSourceApp) -> Unit = {}, onRepoSelected: (SimpleRepo) -> Unit = {}, githubToken: String = "", codebergToken: String = "", languageSetting: String) {
+fun FullRepoListScreen(owner: String, title: String, token: String, platform: String, appsOnly: Boolean = false, isOwnProfile: Boolean = false, ownerAvatarUrl: String = "", onBack: () -> Unit, onAppSelected: (OpenSourceApp) -> Unit = {}, onRepoSelected: (SimpleRepo) -> Unit = {}, onRepoSelectedPR: (SimpleRepo) -> Unit = {}, githubToken: String = "", codebergToken: String = "", languageSetting: String) {
     val scope = rememberCoroutineScope()
     BackHandler { onBack() }
     var repos by remember { mutableStateOf<List<SimpleRepo>>(emptyList()) }; var isLoading by remember { mutableStateOf(true) }
@@ -1144,6 +1188,8 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
         isLoading = false
     } }
     LaunchedEffect(Unit) { refresh() }
+    var showActionChoice by remember { mutableStateOf<SimpleRepo?>(null) }
+    
     Scaffold(
         topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } }, actions = { IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, null) } }) },
         floatingActionButton = { if (isOwnProfile && platform == "GitHub") FloatingActionButton(onClick = { showCreateDialog = true }) { Icon(Icons.Default.Add, null) } }
@@ -1175,13 +1221,84 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
                             }
                         }
                     }
-                }) { RepoCard(repo, languageSetting = languageSetting) { onRepoSelected(repo) } }
+                }) { RepoCard(repo, languageSetting = languageSetting) { showActionChoice = repo } }
             } else RepoCard(repo, languageSetting = languageSetting) { onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platform, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = currentAvatarUrl)) }
             Spacer(Modifier.height(8.dp))
         } }
         if (showCreateDialog) AlertDialog(onDismissRequest = { showCreateDialog = false }, title = { Text(t("new_github_project", languageSetting)) }, text = { Column { OutlinedTextField(value = newRepoName, onValueChange = { newRepoName = it }, label = { Text(t("project_name", languageSetting)) }); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(value = newRepoDesc, onValueChange = { newRepoDesc = it }, label = { Text(t("description", languageSetting)) }); Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = isPrivate, onCheckedChange = { isPrivate = it }); Text(t("private_repository", languageSetting)) } } }, confirmButton = { Button(onClick = { scope.launch { if (createGitHubRepo(token, newRepoName, newRepoDesc, isPrivate)) { showCreateDialog = false; refresh() } } }) { Text(t("create", languageSetting)) } }, dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text(t("cancel", languageSetting)) } })
         if (repoToDelete != null) AlertDialog(onDismissRequest = { repoToDelete = null }, title = { Text(t("delete_project_title", languageSetting)) }, text = { Text(t("delete_project_confirm", languageSetting).replace("%s", repoToDelete!!.name)) }, confirmButton = { Button(onClick = { val r = repoToDelete!!; repoToDelete = null; scope.launch { if (if (platform == "GitHub") deleteGitHubRepo(token, owner, r.name) else deleteCodebergRepo(token, owner, r.name)) refresh() } }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(t("yes_delete", languageSetting)) } }, dismissButton = { TextButton(onClick = { repoToDelete = null }) { Text(t("cancel", languageSetting)) } })
         if (repoToRename != null) AlertDialog(onDismissRequest = { repoToRename = null }, title = { Text(t("rename_project_title", languageSetting)) }, text = { Column { OutlinedTextField(value = renameRepoNameInput, onValueChange = { renameRepoNameInput = it }, label = { Text(t("new_name", languageSetting)) }) } }, confirmButton = { Button(onClick = { val r = repoToRename!!; repoToRename = null; scope.launch { if (if (platform == "GitHub") renameGitHubRepo(token, owner, r.name, renameRepoNameInput) else renameCodebergRepo(token, owner, r.name, renameRepoNameInput)) refresh() } }) { Text(t("rename", languageSetting)) } }, dismissButton = { TextButton(onClick = { repoToRename = null }) { Text(t("cancel", languageSetting)) } })
+        
+        if (showActionChoice != null) {
+            AlertDialog(
+                onDismissRequest = { showActionChoice = null },
+                confirmButton = {},
+                title = null,
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = t("select_action", languageSetting),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = showActionChoice!!.name,
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                        )
+
+                        // EDITOR BUTTON
+                        Button(
+                            onClick = { onRepoSelected(showActionChoice!!); showActionChoice = null },
+                            modifier = Modifier.fillMaxWidth().height(60.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(t("editor", languageSetting), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // PULL REQUESTS BUTTON
+                        Button(
+                            onClick = { 
+                                onRepoSelectedPR(showActionChoice!!)
+                                showActionChoice = null 
+                            },
+                            modifier = Modifier.fillMaxWidth().height(60.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Merge, null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(t("pull_requests", languageSetting), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+                        TextButton(onClick = { showActionChoice = null }) {
+                            Text(t("cancel", languageSetting), color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -1871,6 +1988,181 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun PullRequestsScreen(app: OpenSourceApp, githubToken: String, codebergToken: String, languageSetting: String, onUserClick: (String, String, String) -> Unit, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var prs by remember { mutableStateOf<List<PullRequest>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var filterOpen by remember { mutableStateOf(true) }
+    var selectedPR by remember { mutableStateOf<PullRequest?>(null) }
+    var showFilterMenu by remember { mutableStateOf(false) }
+
+    val token = if (app.platform == "GitHub") githubToken else codebergToken
+
+    fun refresh() {
+        isLoading = true
+        scope.launch {
+            prs = fetchPullRequests(token, app.owner, app.name, app.platform, if (filterOpen) "open" else "closed")
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(filterOpen) { refresh() }
+
+    val context = LocalContext.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(t("pull_requests", languageSetting)) },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) } },
+                    actions = {
+                        Box {
+                            TextButton(onClick = { showFilterMenu = true }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(if (filterOpen) t("open", languageSetting) else t("closed", languageSetting))
+                                    Icon(Icons.Default.ArrowDropDown, null)
+                                }
+                            }
+                            DropdownMenu(expanded = showFilterMenu, onDismissRequest = { showFilterMenu = false }) {
+                                DropdownMenuItem(text = { Text(t("open", languageSetting)) }, onClick = { filterOpen = true; showFilterMenu = false }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.Green) })
+                                DropdownMenuItem(text = { Text(t("closed", languageSetting)) }, onClick = { filterOpen = false; showFilterMenu = false }, leadingIcon = { Icon(Icons.Default.CheckCircle, null, tint = Color.Red) })
+                            }
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+                else if (prs.isEmpty()) Text(t("no_pull_requests", languageSetting), Modifier.align(Alignment.Center))
+                else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(prs) { pr ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).clickable { selectedPR = pr },
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            ) {
+                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    AsyncImage(model = pr.userAvatar, contentDescription = null, modifier = Modifier.size(40.dp).clip(CircleShape))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(pr.title, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("#${pr.number} by ", fontSize = 11.sp, color = Color.Gray)
+                                            Text(text = pr.user, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onUserClick(pr.user, app.platform, pr.userAvatar); onDismiss() })
+                                        }
+                                    }
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (selectedPR != null) {
+            PRDetailScreen(app = app, pr = selectedPR!!, token = token, languageSetting = languageSetting, onUserClick = { u, p, a -> onUserClick(u, p, a); onDismiss() }, onBack = { selectedPR = null; refresh() })
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageSetting: String, onUserClick: (String, String, String) -> Unit, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var comments by remember { mutableStateOf<List<IssueComment>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var commentText by remember { mutableStateOf("") }
+    val myProfile = remember { mutableStateOf<UserProfile?>(null) }
+    var showMergeConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        myProfile.value = if (app.platform == "GitHub") fetchGitHubProfile(token) else fetchCodebergProfile(token)
+        comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login)
+        isLoading = false
+    }
+
+    if (showMergeConfirm) {
+        AlertDialog(
+            onDismissRequest = { showMergeConfirm = false },
+            title = { Text(t("merge", languageSetting)) },
+            text = { Text(t("merge_confirm", languageSetting)) },
+            confirmButton = { Button(onClick = { scope.launch { if (mergePullRequest(token, app.owner, app.name, app.platform, pr.number)) onBack(); showMergeConfirm = false } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) { Text(t("yes_merge", languageSetting)) } },
+            dismissButton = { TextButton(onClick = { showMergeConfirm = false }) { Text(t("cancel", languageSetting)) } }
+        )
+    }
+
+    Dialog(onDismissRequest = onBack, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("#${pr.number}") },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
+                    actions = {
+                        if (pr.state == "open" && app.owner == myProfile.value?.login) {
+                            Button(onClick = { showMergeConfirm = true }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), modifier = Modifier.padding(end = 8.dp)) {
+                                Text(t("merge", languageSetting))
+                            }
+                        }
+                    }
+                )
+            },
+            bottomBar = {
+                Surface(tonalElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
+                    Row(modifier = Modifier.padding(8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = commentText, onValueChange = { commentText = it }, placeholder = { Text(t("write_comment", languageSetting)) }, modifier = Modifier.weight(1f), maxLines = 5)
+                        IconButton(onClick = { scope.launch { if (commentText.isNotBlank() && postComment(token, app.owner, app.name, app.platform, pr.number, commentText)) { commentText = ""; comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login) } } }, enabled = commentText.isNotBlank()) { Icon(Icons.Default.Send, null, tint = if(commentText.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray) }
+                    }
+                }
+            }
+        ) { padding ->
+            LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth().padding(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
+                        Column(Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(model = pr.userAvatar, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onUserClick(pr.user, app.platform, pr.userAvatar) })
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(text = pr.user, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clickable { onUserClick(pr.user, app.platform, pr.userAvatar) })
+                                    val statusColor = when(pr.state) {
+                                        "open" -> Color(0xFF4CAF50)
+                                        "merged" -> Color(0xFF673AB7)
+                                        else -> Color(0xFFE57373)
+                                    }
+                                    Text(t(pr.state, languageSetting), color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp)); Text(pr.title, fontSize = 19.sp, fontWeight = FontWeight.Black)
+                            if (pr.headLabel != null) { Text("from: ${pr.headLabel}", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp)) }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MarkdownBody(pr.body)
+                        }
+                    }
+                    Text(t("comments", languageSetting), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 16.sp)
+                }
+                if (isLoading) item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                items(comments) { comment ->
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+                        Row(Modifier.padding(8.dp)) {
+                            AsyncImage(model = comment.userAvatar, contentDescription = null, modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) })
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(text = comment.user, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.clickable { onUserClick(comment.user, app.platform, comment.userAvatar) })
+                                MarkdownBody(comment.body)
+                            }
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun RepoStatsScreen(app: OpenSourceApp, githubToken: String, codebergToken: String, languageSetting: String, onDismiss: () -> Unit) {
     var stats by remember { mutableStateOf<RepoStats?>(null) }
     var releases by remember { mutableStateOf<List<AppRelease>>(emptyList()) }
@@ -2315,6 +2607,46 @@ private suspend fun fetchIssues(token: String, owner: String, repo: String, plat
         }
     } catch (e: Exception) {}
     list
+}
+
+private suspend fun fetchPullRequests(token: String, owner: String, repo: String, platform: String, state: String): List<PullRequest> = withContext(Dispatchers.IO) {
+    val list = mutableListOf<PullRequest>()
+    try {
+        val auth = if (platform == "GitHub") "Bearer $token" else "token $token"
+        val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/pulls?state=$state" else "https://codeberg.org/api/v1/repos/$owner/$repo/pulls?state=$state"
+        httpClient.newCall(Request.Builder().url(url).addHeader("Authorization", auth).addHeader("User-Agent", "OpiStore").build()).execute().use { resp ->
+            val arr = JSONArray(resp.body?.string() ?: "[]")
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val user = obj.getJSONObject("user")
+                val state = obj.getString("state")
+                val isMerged = if (platform == "GitHub") !obj.isNull("merged_at") else obj.optBoolean("merged", false)
+                val displayState = if (isMerged) "merged" else state
+                list.add(PullRequest(
+                    obj.getString("id"),
+                    obj.getInt("number"),
+                    obj.getString("title"),
+                    obj.optString("body", ""),
+                    displayState,
+                    user.getString("login"),
+                    user.getString("avatar_url"),
+                    0,
+                    obj.optString("created_at", ""),
+                    obj.optJSONObject("head")?.optString("label", "")
+                ))
+            }
+        }
+    } catch (e: Exception) {}
+    list
+}
+
+private suspend fun mergePullRequest(token: String, owner: String, repo: String, platform: String, number: Int): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val auth = if (platform == "GitHub") "Bearer $token" else "token $token"
+        val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/pulls/$number/merge" else "https://codeberg.org/api/v1/repos/$owner/$repo/pulls/$number/merge"
+        val body = JSONObject().toString().toRequestBody("application/json".toMediaType())
+        httpClient.newCall(Request.Builder().url(url).put(body).addHeader("Authorization", auth).addHeader("User-Agent", "OpiStore").build()).execute().use { it.isSuccessful }
+    } catch (e: Exception) { false }
 }
 
 private suspend fun fetchIssueComments(token: String, owner: String, repo: String, platform: String, number: Int, myLogin: String?): List<IssueComment> = withContext(Dispatchers.IO) {
