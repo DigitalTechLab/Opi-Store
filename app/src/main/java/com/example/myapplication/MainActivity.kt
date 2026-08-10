@@ -54,6 +54,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import kotlinx.coroutines.CoroutineScope
@@ -224,6 +228,8 @@ private fun t(key: String, lang: String): String {
         "yes_merge" -> if (isDe) "Ja, Mergen" else "Yes, merge"
         "no_pull_requests" -> if (isDe) "Keine Pull Requests gefunden." else "No pull requests found."
         "merged" -> if (isDe) "Gemerged" else "Merged"
+        "category_appearance" -> if (isDe) "AUSSEHEN" else "APPEARANCE"
+        "category_system" -> if (isDe) "SYSTEM & UPDATES" else "SYSTEM & UPDATES"
         else -> key
     }
 }
@@ -383,23 +389,7 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
                         languageSetting = languageSetting
                     )
                     1 -> ApkManagerScreen(githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, activeDownloads = activeDownloads, globalScope = scope)
-                    2 -> AccountMultiScreen(
-                        githubToken = githubToken,
-                        codebergToken = codebergToken,
-                        onGithubTokenSaved = { t -> githubToken = t; sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply() },
-                        onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() },
-                        initialPlatform = fullRepoListPlatform,
-                        onPlatformChange = { fullRepoListPlatform = it },
-                        onUsernameClick = { login, platform ->
-                            fullRepoListPlatform = platform
-                            fullRepoListAppsOnly = false
-                            fullRepoListAvatarUrl = ""
-                            isViewingOwnProfile = true
-                            showFullRepoListForUser = login
-                        },
-                        languageSetting = languageSetting,
-                        onAppSelected = { selectedAppForDetail = it }
-                    )
+                    2 -> AccountMultiScreen(githubToken = githubToken, codebergToken = codebergToken, onGithubTokenSaved = { t -> githubToken = t; sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply() }, onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() }, onUsernameClick = { login, platform -> fullRepoListPlatform = platform; fullRepoListAppsOnly = false; fullRepoListAvatarUrl = ""; isViewingOwnProfile = true; showFullRepoListForUser = login }, languageSetting = languageSetting, onAppSelected = { selectedAppForDetail = it })
                     3 -> SettingsScreen(
                         currentTheme = themeSetting.value,
                         onThemeChange = { themeSetting.value = it; sharedPrefs.edit().putString("THEME_SETTING", it).apply() },
@@ -429,12 +419,21 @@ fun SettingsScreen(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Text(
             text = t("settings_title", languageSetting),
-            fontSize = 28.sp,
+            fontSize = 32.sp,
             fontWeight = FontWeight.Black,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        // CATEGORY: APPEARANCE
+        Text(
+            text = t("category_appearance", languageSetting),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
         )
 
         // Design Button
@@ -494,7 +493,16 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // CATEGORY: SYSTEM
+        Text(
+            text = t("category_system", languageSetting),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+        )
 
         // Updates Button
         Button(
@@ -593,18 +601,18 @@ fun SettingsScreen(
 }
 
 @Composable
-fun AccountMultiScreen(githubToken: String, codebergToken: String, onGithubTokenSaved: (String) -> Unit, onCodebergTokenSaved: (String) -> Unit, initialPlatform: String, onPlatformChange: (String) -> Unit, onUsernameClick: (String, String) -> Unit, languageSetting: String, onAppSelected: (OpenSourceApp) -> Unit) {
-    var selectedPlatform by remember { mutableIntStateOf(if (initialPlatform == "Codeberg") 1 else 0) }
+fun AccountMultiScreen(githubToken: String, codebergToken: String, onGithubTokenSaved: (String) -> Unit, onCodebergTokenSaved: (String) -> Unit, onUsernameClick: (String, String) -> Unit, languageSetting: String, onAppSelected: (OpenSourceApp) -> Unit) {
+    var selectedPlatform by remember { mutableIntStateOf(0) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).height(48.dp), horizontalArrangement = Arrangement.Center) {
             val ghSelected = selectedPlatform == 0
-            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp), color = if (ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 0; onPlatformChange("GitHub") }) {
+            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp), color = if (ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 0 }) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(model = "https://github.com/fluidicon.png", contentDescription = null, modifier = Modifier.size(20.dp).clip(CircleShape))
                     Spacer(modifier = Modifier.width(8.dp)); Text("GitHub", fontWeight = FontWeight.Bold, color = if (ghSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
                 }
             }
-            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp), color = if (!ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 1; onPlatformChange("Codeberg") }) {
+            Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp), color = if (!ghSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, onClick = { selectedPlatform = 1 }) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(model = "https://codeberg.org/assets/img/logo.png", contentDescription = null, modifier = Modifier.size(20.dp).clip(CircleShape))
                     Spacer(modifier = Modifier.width(8.dp)); Text("Codeberg", fontWeight = FontWeight.Bold, color = if (!ghSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
@@ -839,6 +847,65 @@ fun AppCard(app: OpenSourceApp, onClick: () -> Unit) {
     }
 }
 
+@Composable
+fun ImageZoomScreen(imageUrl: String, onDismiss: () -> Unit) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            val maxWidthPx = constraints.maxWidth.toFloat()
+            val maxHeightPx = constraints.maxHeight.toFloat()
+
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1f) {
+                                val maxX = (maxWidthPx * (scale - 1)) / 2
+                                val maxY = (maxHeightPx * (scale - 1)) / 2
+                                offset = Offset(
+                                    (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                    (offset.y + pan.y).coerceIn(-maxY, maxY)
+                                )
+                            } else {
+                                offset = Offset.Zero
+                            }
+                        }
+                    }
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y
+                    ),
+                contentScale = ContentScale.Fit
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppDetailFullScreen(
@@ -859,6 +926,7 @@ fun AppDetailFullScreen(
 
     var showIssues by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
+    var showImageZoom by remember { mutableStateOf(false) }
 
     LaunchedEffect(app) {
         if (app.preFetchedReleases != null) {
@@ -891,7 +959,7 @@ fun AppDetailFullScreen(
     }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp, vertical = 16.dp)) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState), horizontalAlignment = Alignment.CenterHorizontally) {
-                AsyncImage(model = app.avatarUrl, contentDescription = "Logo", contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).clip(CircleShape))
+                AsyncImage(model = app.avatarUrl, contentDescription = "Logo", contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).clip(CircleShape).clickable { showImageZoom = true })
                 Spacer(modifier = Modifier.height(16.dp)); Text(text = app.name, fontWeight = FontWeight.Bold, fontSize = 28.sp)
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1015,6 +1083,9 @@ fun AppDetailFullScreen(
                 }
             }
         }
+    }
+    if (showImageZoom) {
+        ImageZoomScreen(imageUrl = app.avatarUrl, onDismiss = { showImageZoom = false })
     }
 }
 
@@ -1199,9 +1270,11 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
         else LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) { items(repos, key = { it.htmlUrl }) { repo ->
             if (isOwnProfile) {
                 val state = rememberSwipeToDismissBoxState(confirmValueChange = {
-                    if (it == SwipeToDismissBoxValue.EndToStart) { repoToDelete = repo; false }
-                    else if (it == SwipeToDismissBoxValue.StartToEnd) { repoToRename = repo; renameRepoNameInput = repo.name; false }
-                    else false
+                    if (it == SwipeToDismissBoxValue.EndToStart) {
+                        if (repoToRename == null) { repoToDelete = repo; false } else false
+                    } else if (it == SwipeToDismissBoxValue.StartToEnd) {
+                        if (repoToDelete == null) { repoToRename = repo; renameRepoNameInput = repo.name; false } else false
+                    } else false
                 })
                 SwipeToDismissBox(state = state, backgroundContent = {
                     val direction = state.dismissDirection
@@ -1222,7 +1295,8 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
                         }
                     }
                 }) { RepoCard(repo, languageSetting = languageSetting) { showActionChoice = repo } }
-            } else RepoCard(repo, languageSetting = languageSetting) { onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platform, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = currentAvatarUrl)) }
+            }
+else RepoCard(repo, languageSetting = languageSetting) { onAppSelected(OpenSourceApp(id = "${repo.owner}/${repo.name}", name = repo.name, owner = repo.owner, platform = platform, description = repo.description, repoUrl = repo.htmlUrl, avatarUrl = currentAvatarUrl)) }
             Spacer(Modifier.height(8.dp))
         } }
         if (showCreateDialog) AlertDialog(onDismissRequest = { showCreateDialog = false }, title = { Text(t("new_github_project", languageSetting)) }, text = { Column { OutlinedTextField(value = newRepoName, onValueChange = { newRepoName = it }, label = { Text(t("project_name", languageSetting)) }); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(value = newRepoDesc, onValueChange = { newRepoDesc = it }, label = { Text(t("description", languageSetting)) }); Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = isPrivate, onCheckedChange = { isPrivate = it }); Text(t("private_repository", languageSetting)) } } }, confirmButton = { Button(onClick = { scope.launch { if (createGitHubRepo(token, newRepoName, newRepoDesc, isPrivate)) { showCreateDialog = false; refresh() } } }) { Text(t("create", languageSetting)) } }, dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text(t("cancel", languageSetting)) } })
@@ -2077,6 +2151,8 @@ fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageS
     val myProfile = remember { mutableStateOf<UserProfile?>(null) }
     var showMergeConfirm by remember { mutableStateOf(false) }
 
+    var commentToDelete by remember { mutableStateOf<IssueComment?>(null) }
+
     LaunchedEffect(Unit) {
         myProfile.value = if (app.platform == "GitHub") fetchGitHubProfile(token) else fetchCodebergProfile(token)
         comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login)
@@ -2090,6 +2166,25 @@ fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageS
             text = { Text(t("merge_confirm", languageSetting)) },
             confirmButton = { Button(onClick = { scope.launch { if (mergePullRequest(token, app.owner, app.name, app.platform, pr.number)) onBack(); showMergeConfirm = false } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) { Text(t("yes_merge", languageSetting)) } },
             dismissButton = { TextButton(onClick = { showMergeConfirm = false }) { Text(t("cancel", languageSetting)) } }
+        )
+    }
+
+    if (commentToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { commentToDelete = null },
+            title = { Text(t("delete_comment_title", languageSetting)) },
+            text = { Text(t("delete_comment_confirm", languageSetting)) },
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch {
+                        if (deleteComment(token, app.owner, app.name, app.platform, commentToDelete!!.id)) {
+                            comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login)
+                        }
+                        commentToDelete = null
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text(t("yes_delete", languageSetting)) }
+            },
+            dismissButton = { TextButton(onClick = { commentToDelete = null }) { Text(t("cancel", languageSetting)) } }
         )
     }
 
@@ -2149,8 +2244,39 @@ fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageS
                             AsyncImage(model = comment.userAvatar, contentDescription = null, modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) })
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(text = comment.user, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.clickable { onUserClick(comment.user, app.platform, comment.userAvatar) })
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = comment.user, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f).clickable { onUserClick(comment.user, app.platform, comment.userAvatar) })
+                                    if (comment.user == myProfile.value?.login) {
+                                        IconButton(onClick = { commentToDelete = comment }, modifier = Modifier.size(20.dp)) { Icon(Icons.Default.Delete, null, tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)) }
+                                    }
+                                }
                                 MarkdownBody(comment.body)
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                                    val isLiked = comment.myReactionId != null
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { scope.launch { if (toggleReaction(token, app.owner, app.name, app.platform, comment.id, comment.myReactionId)) comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login) } }
+                                            .padding(6.dp)
+                                    ) {
+                                        Icon(
+                                            if (isLiked) Icons.Default.ThumbUp else Icons.Default.ThumbUpOffAlt,
+                                            null,
+                                            Modifier.size(18.dp),
+                                            tint = if (isLiked) MaterialTheme.colorScheme.primary else Color.Gray
+                                        )
+                                        if (comment.reactions > 0) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                text = "${comment.reactions}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isLiked) MaterialTheme.colorScheme.primary else Color.Gray
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -2663,21 +2789,39 @@ private suspend fun fetchIssueComments(token: String, owner: String, repo: Strin
             val arr = JSONArray(resp.body?.string() ?: "[]")
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); val user = obj.getJSONObject("user")
-                val reactions = if (obj.has("reactions")) obj.getJSONObject("reactions").optInt("total_count", 0) else 0
-
-                // For GitHub, we can fetch reactions to see if "I" liked it.
-                // Simplified: we only check if the current user has a reaction ID.
+                
+                var reactions = 0
                 var myReactionId: String? = null
-                if (platform == "GitHub" && myLogin != null) {
-                    val reactionUrl = "https://api.github.com/repos/$owner/$repo/issues/comments/${obj.getString("id")}/reactions"
-                    httpClient.newCall(Request.Builder().url(reactionUrl).addHeader("Authorization", auth).build()).execute().use { rResp ->
-                        if (rResp.isSuccessful) {
-                            val rArr = JSONArray(rResp.body?.string() ?: "[]")
-                            for (j in 0 until rArr.length()) {
-                                val rObj = rArr.getJSONObject(j)
-                                if (rObj.getJSONObject("user").getString("login") == myLogin && rObj.getString("content") == "+1") {
-                                    myReactionId = rObj.getString("id")
-                                    break
+                
+                if (platform == "GitHub") {
+                    reactions = if (obj.has("reactions")) obj.getJSONObject("reactions").optInt("total_count", 0) else 0
+                    if (myLogin != null) {
+                        val reactionUrl = "https://api.github.com/repos/$owner/$repo/issues/comments/${obj.getString("id")}/reactions"
+                        httpClient.newCall(Request.Builder().url(reactionUrl).addHeader("Authorization", auth).build()).execute().use { rResp ->
+                            if (rResp.isSuccessful) {
+                                val rArr = JSONArray(rResp.body?.string() ?: "[]")
+                                for (j in 0 until rArr.length()) {
+                                    val rObj = rArr.getJSONObject(j)
+                                    if (rObj.getJSONObject("user").getString("login") == myLogin && rObj.getString("content") == "+1") {
+                                        myReactionId = rObj.getString("id")
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (platform == "Codeberg") {
+                    if (obj.has("reactions")) {
+                        val rArr = obj.optJSONArray("reactions")
+                        if (rArr != null) {
+                            reactions = rArr.length()
+                            if (myLogin != null) {
+                                for (j in 0 until rArr.length()) {
+                                    val rObj = rArr.getJSONObject(j)
+                                    if (rObj.optJSONObject("user")?.optString("login") == myLogin && rObj.optString("content") == "+1") {
+                                        myReactionId = "exists"
+                                        break
+                                    }
                                 }
                             }
                         }
@@ -2755,6 +2899,15 @@ private suspend fun toggleReaction(token: String, owner: String, repo: String, p
                 val json = JSONObject().apply { put("content", "+1") }.toString().toRequestBody("application/json".toMediaType())
                 httpClient.newCall(Request.Builder().url(url).post(json).addHeader("Authorization", "Bearer $token").addHeader("Accept", "application/vnd.github.squirrel-girl-preview+json").build()).execute().use { it.isSuccessful }
             }
+        } else if (platform == "Codeberg") {
+            val url = "https://codeberg.org/api/v1/repos/$owner/$repo/issues/comments/$commentId/reactions"
+            val jsonBody = JSONObject().apply { put("content", "+1") }.toString().toRequestBody("application/json".toMediaType())
+            val req = if (currentReactionId != null) {
+                Request.Builder().url(url).delete(jsonBody).addHeader("Authorization", "token $token").build()
+            } else {
+                Request.Builder().url(url).post(jsonBody).addHeader("Authorization", "token $token").build()
+            }
+            httpClient.newCall(req).execute().use { it.isSuccessful }
         } else false
     } catch (e: Exception) { false }
 }
