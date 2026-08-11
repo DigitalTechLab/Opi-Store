@@ -1,7 +1,9 @@
 package com.example.myapplication
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Bundle
@@ -228,8 +230,13 @@ private fun t(key: String, lang: String): String {
         "yes_merge" -> if (isDe) "Ja, Mergen" else "Yes, merge"
         "no_pull_requests" -> if (isDe) "Keine Pull Requests gefunden." else "No pull requests found."
         "merged" -> if (isDe) "Gemerged" else "Merged"
-        "category_appearance" -> if (isDe) "AUSSEHEN" else "APPEARANCE"
-        "category_system" -> if (isDe) "SYSTEM & UPDATES" else "SYSTEM & UPDATES"
+        "category_appearance" -> if (isDe) "Aussehen" else "Appearance"
+        "category_system" -> if (isDe) "System & Updates" else "System & Updates"
+        "auto_delete_apk" -> if (isDe) "APK Auto-Löschen" else "Auto-delete APK"
+        "searching_updates" -> if (isDe) "Suche nach Updates..." else "Checking for updates..."
+        "no_update_found" -> if (isDe) "Kein Update gefunden." else "No update found."
+        "update_available_msg" -> if (isDe) "Update verfügbar!" else "Update available!"
+        "update_button" -> if (isDe) "Jetzt Aktualisieren" else "Update Now"
         else -> key
     }
 }
@@ -262,6 +269,12 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
     var languageSetting by remember { mutableStateOf(sharedPrefs.getString("LANGUAGE_SETTING", "en") ?: "en") }
 
     var updatesEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("UPDATES_ENABLED", true)) }
+    var autoDeleteApk by remember { mutableStateOf(sharedPrefs.getBoolean("AUTO_DELETE_APK", false)) }
+    var apkListRefreshTrigger by remember { mutableIntStateOf(0) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<OpenSourceApp>>(emptyList()) }
+    var searchIsLoading by remember { mutableStateOf(false) }
+    var searchStatusMessage by remember { mutableStateOf("") }
     var skippedVersion by remember { mutableStateOf(sharedPrefs.getString("SKIPPED_VERSION", "") ?: "") }
     var showUpdateScreen by remember { mutableStateOf<AppRelease?>(null) }
 
@@ -274,6 +287,63 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
             val file = java.io.File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
             if (file.exists()) file.delete()
         } catch (e: Exception) {}
+
+        // Cleanup orphaned APKs from mapping
+        val mapping = sharedPrefs.getStringSet("APK_DELETE_MAPPING", emptySet()) ?: emptySet()
+        if (mapping.isNotEmpty()) {
+            val toRemove = mutableSetOf<String>()
+            mapping.forEach { entry ->
+                val parts = entry.split("|")
+                if (parts.size == 2) {
+                    val pkg = parts[0]
+                    val path = parts[1]
+                    try {
+                        context.packageManager.getPackageInfo(pkg, 0)
+                        val file = File(path)
+                        if (file.exists()) file.delete()
+                        toRemove.add(entry)
+                    } catch (e: Exception) {}
+                }
+            }
+            if (toRemove.isNotEmpty()) {
+                val newMapping = mapping.toMutableSet().apply { removeAll(toRemove) }
+                sharedPrefs.edit().putStringSet("APK_DELETE_MAPPING", newMapping).apply()
+            }
+        }
+    }
+
+    DisposableEffect(autoDeleteApk) {
+        if (!autoDeleteApk) return@DisposableEffect onDispose {}
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_PACKAGE_ADDED || intent.action == Intent.ACTION_PACKAGE_REPLACED) {
+                    val packageName = intent.data?.schemeSpecificPart ?: return
+                    val mapping = sharedPrefs.getStringSet("APK_DELETE_MAPPING", emptySet()) ?: emptySet()
+                    val entry = mapping.find { it.startsWith("$packageName|") }
+                    if (entry != null) {
+                        val path = entry.substringAfter("|")
+                        val file = File(path)
+                        if (file.exists()) {
+                            file.delete()
+                            apkListRefreshTrigger++
+                        }
+                        val newMapping = mapping.toMutableSet().apply { remove(entry) }
+                        sharedPrefs.edit().putStringSet("APK_DELETE_MAPPING", newMapping).apply()
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose { try { context.unregisterReceiver(receiver) } catch (e: Exception) {} }
     }
 
     LaunchedEffect(updatesEnabled) {
@@ -386,9 +456,17 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
                             isViewingOwnProfile = false
                             showFullRepoListForUser = owner
                         },
-                        languageSetting = languageSetting
+                        languageSetting = languageSetting,
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        searchResults = searchResults,
+                        onSearchResultsChange = { searchResults = it },
+                        isLoading = searchIsLoading,
+                        onIsLoadingChange = { searchIsLoading = it },
+                        statusMessage = searchStatusMessage,
+                        onStatusMessageChange = { searchStatusMessage = it }
                     )
-                    1 -> ApkManagerScreen(githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, activeDownloads = activeDownloads, globalScope = scope)
+                    1 -> ApkManagerScreen(githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, activeDownloads = activeDownloads, globalScope = scope, refreshTrigger = apkListRefreshTrigger)
                     2 -> AccountMultiScreen(githubToken = githubToken, codebergToken = codebergToken, onGithubTokenSaved = { t -> githubToken = t; sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply() }, onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() }, onUsernameClick = { login, platform -> fullRepoListPlatform = platform; fullRepoListAppsOnly = false; fullRepoListAvatarUrl = ""; isViewingOwnProfile = true; showFullRepoListForUser = login }, languageSetting = languageSetting, onAppSelected = { selectedAppForDetail = it })
                     3 -> SettingsScreen(
                         currentTheme = themeSetting.value,
@@ -397,6 +475,8 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
                         onLanguageChange = { languageSetting = it; sharedPrefs.edit().putString("LANGUAGE_SETTING", it).apply() },
                         updatesEnabled = updatesEnabled,
                         onUpdatesEnabledChange = { updatesEnabled = it; sharedPrefs.edit().putBoolean("UPDATES_ENABLED", it).apply() },
+                        autoDeleteApk = autoDeleteApk,
+                        onAutoDeleteApkChange = { autoDeleteApk = it; sharedPrefs.edit().putBoolean("AUTO_DELETE_APK", it).apply() },
                         languageSetting = languageSetting
                     )
                 }
@@ -413,11 +493,14 @@ fun SettingsScreen(
     onLanguageChange: (String) -> Unit,
     updatesEnabled: Boolean,
     onUpdatesEnabledChange: (Boolean) -> Unit,
+    autoDeleteApk: Boolean,
+    onAutoDeleteApkChange: (Boolean) -> Unit,
     languageSetting: String
 ) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    var showAutoDeleteDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -430,10 +513,10 @@ fun SettingsScreen(
         // CATEGORY: APPEARANCE
         Text(
             text = t("category_appearance", languageSetting),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+            modifier = Modifier.padding(bottom = 16.dp, start = 4.dp)
         )
 
         // Design Button
@@ -498,10 +581,10 @@ fun SettingsScreen(
         // CATEGORY: SYSTEM
         Text(
             text = t("category_system", languageSetting),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+            modifier = Modifier.padding(bottom = 16.dp, start = 4.dp)
         )
 
         // Updates Button
@@ -523,6 +606,30 @@ fun SettingsScreen(
                     Text(t("updates", languageSetting), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
                 Text(if (updatesEnabled) t("on", languageSetting) else t("off", languageSetting), color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Auto Delete APK Button
+        Button(
+            onClick = { showAutoDeleteDialog = true },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text(t("auto_delete_apk", languageSetting), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                }
+                Text(if (autoDeleteApk) t("on", languageSetting) else t("off", languageSetting), color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -591,6 +698,28 @@ fun SettingsScreen(
                             RadioButton(selected = updatesEnabled == enabled, onClick = { onUpdatesEnabledChange(enabled); showUpdateDialog = false })
                             Spacer(Modifier.width(12.dp))
                             Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    if (showAutoDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showAutoDeleteDialog = false },
+            title = { Text(t("auto_delete_apk", languageSetting)) },
+            text = {
+                Column {
+                    listOf(true, false).forEach { enabled ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onAutoDeleteApkChange(enabled); showAutoDeleteDialog = false }.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = autoDeleteApk == enabled, onClick = { onAutoDeleteApkChange(enabled); showAutoDeleteDialog = false })
+                            Spacer(Modifier.width(12.dp))
+                            Text(if (enabled) t("on", languageSetting) else t("off", languageSetting))
                         }
                     }
                 }
@@ -784,14 +913,10 @@ fun RepoCard(repo: SimpleRepo, languageSetting: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (OpenSourceApp) -> Unit, onUserSelected: (String, String, String) -> Unit, languageSetting: String) {
+fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (OpenSourceApp) -> Unit, onUserSelected: (String, String, String) -> Unit, languageSetting: String, query: String, onQueryChange: (String) -> Unit, searchResults: List<OpenSourceApp>, onSearchResultsChange: (List<OpenSourceApp>) -> Unit, isLoading: Boolean, onIsLoadingChange: (Boolean) -> Unit, statusMessage: String, onStatusMessageChange: (String) -> Unit) {
     val scope = rememberCoroutineScope()
-    var query by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<OpenSourceApp>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf("") }
     fun performSearch(searchQuery: String) {
-        query = searchQuery; isLoading = true; searchResults = emptyList()
+        onQueryChange(searchQuery); onIsLoadingChange(true); onSearchResultsChange(emptyList())
         scope.launch {
             try {
                 if (searchQuery.startsWith("http")) {
@@ -803,30 +928,31 @@ fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (Ope
                         val username = parts[0]
                         val avatar = if (platform == "GitHub") "https://github.com/$username.png" else ""
                         onUserSelected(username, platform, avatar)
-                        isLoading = false
+                        onIsLoadingChange(false)
                         return@launch
                     }
 
-                    statusMessage = t("status_loading_repo", languageSetting)
+                    onStatusMessageChange(t("status_loading_repo", languageSetting))
                     val app = fetchAppFromUrl(searchQuery, githubToken, codebergToken)
                     if (app != null) {
                         val releases = fetchReleasesForApp(app, githubToken, codebergToken)
                         if (releases.isNotEmpty()) {
                             onAppSelected(app.copy(preFetchedReleases = releases))
-                            statusMessage = ""
-                        } else statusMessage = t("status_no_apks", languageSetting)
-                    } else statusMessage = t("status_no_project", languageSetting)
+                            onStatusMessageChange("")
+                        } else onStatusMessageChange(t("status_no_apks", languageSetting))
+                    } else onStatusMessageChange(t("status_no_project", languageSetting))
                 } else {
-                    statusMessage = t("status_searching", languageSetting)
-                    searchResults = searchMultiSourceApps(searchQuery, githubToken, codebergToken)
-                    statusMessage = if (searchResults.isEmpty()) t("status_no_apps_found", languageSetting) else ""
+                    onStatusMessageChange(t("status_searching", languageSetting))
+                    val results = searchMultiSourceApps(searchQuery, githubToken, codebergToken)
+                    onSearchResultsChange(results)
+                    onStatusMessageChange(if (results.isEmpty()) t("status_no_apps_found", languageSetting) else "")
                 }
-            } catch (e: Exception) { statusMessage = t("status_error", languageSetting) } finally { isLoading = false }
+            } catch (e: Exception) { onStatusMessageChange(t("status_error", languageSetting)) } finally { onIsLoadingChange(false) }
         }
     }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(t("search_title", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(t("search_hint", languageSetting)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, trailingIcon = { IconButton(onClick = { if (query.isNotBlank()) performSearch(query) }) { Icon(Icons.Default.Search, null) } }); Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(value = query, onValueChange = { onQueryChange(it) }, label = { Text(t("search_hint", languageSetting)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, trailingIcon = { IconButton(onClick = { if (query.isNotBlank()) performSearch(query) }) { Icon(Icons.Default.Search, null) } }); Spacer(modifier = Modifier.height(16.dp))
         if (isLoading) Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         else if (statusMessage.isNotEmpty()) Text(statusMessage, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) { items(searchResults) { app -> AppCard(app = app, onClick = { onAppSelected(app) }) } }
@@ -1124,16 +1250,17 @@ fun VersionItem(release: AppRelease, isSelected: Boolean, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting: String, activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope) {
+fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting: String, activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope, refreshTrigger: Int) {
     val context = LocalContext.current
     var downloadedFiles by remember { mutableStateOf<List<File>>(emptyList()) }
     var selectedFileForDialog by remember { mutableStateOf<File?>(null) }
     var isRepairingLocal by remember { mutableStateOf(false) }
     var repairProgressLocal by remember { mutableStateOf("") }
     var currentFileValid by remember { mutableStateOf(true) }
+    var showUpdatePanel by remember { mutableStateOf<File?>(null) }
 
     fun refreshFiles() { val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS); downloadedFiles = dir?.listFiles { _, name -> name.endsWith(".apk") && name != "update.apk" }?.toList() ?: emptyList() }
-    LaunchedEffect(Unit) { refreshFiles() }
+    LaunchedEffect(Unit, refreshTrigger) { refreshFiles() }
 
     if (selectedFileForDialog != null) {
         val file = selectedFileForDialog!!
@@ -1165,7 +1292,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                     Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
                 }
                 Spacer(modifier = Modifier.height(16.dp)); Text(appName.ifBlank { file.name }, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
-                if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp)) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showUpdatePanel = file }) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 
                 if (!currentFileValid && !isDownloadingGlobal) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
@@ -1238,6 +1365,128 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
             }; Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
             } }
         } }
+    }
+
+    if (showUpdatePanel != null) {
+        val file = showUpdatePanel!!
+        val fileName = file.name
+        val parts = fileName.removeSuffix(".apk").split("_")
+        val platform = parts.getOrNull(0) ?: ""
+        val owner = parts.getOrNull(1) ?: ""
+        val appName = parts.getOrNull(2) ?: ""
+        val version = parts.getOrNull(3) ?: ""
+
+        var latestRelease by remember { mutableStateOf<AppRelease?>(null) }
+        var isSearching by remember { mutableStateOf(true) }
+
+        LaunchedEffect(Unit) {
+            val rels = if (platform == "GitHub") fetchGitHubReleases(owner, appName, githubToken)
+            else if (platform == "Codeberg") fetchCodebergReleases(owner, appName, codebergToken)
+            else emptyList()
+            
+            val currentRelease = rels.find { it.version == version }
+            val currentIsPre = currentRelease?.isPreRelease ?: false
+            
+            latestRelease = if (currentIsPre) {
+                // If current is pre-release, look for the newest release of any kind
+                rels.firstOrNull()
+            } else {
+                // If current is stable, look only for the newest stable release
+                rels.firstOrNull { !it.isPreRelease } ?: rels.firstOrNull()
+            }
+            isSearching = false
+        }
+
+        Dialog(onDismissRequest = { showUpdatePanel = null }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(t("updates", languageSetting), fontWeight = FontWeight.Bold) },
+                        navigationIcon = { IconButton(onClick = { showUpdatePanel = null }) { Icon(Icons.Default.Close, null) } }
+                    )
+                }
+            ) { padding ->
+                Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (isSearching) {
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(16.dp))
+                                Text(t("searching_updates", languageSetting), color = Color.Gray)
+                            }
+                        }
+                    } else if (latestRelease != null) {
+                        val lr = latestRelease!!
+                        val isNewer = isNewerVersion(version, lr.version)
+                        
+                        Column(modifier = Modifier.padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(if(isNewer) Icons.Default.NewReleases else Icons.Default.CheckCircle, null, modifier = Modifier.size(72.dp), tint = if(isNewer) MaterialTheme.colorScheme.primary else Color(0xFF4CAF50))
+                            Spacer(Modifier.height(16.dp))
+                            Text(if (isNewer) t("update_available_msg", languageSetting) else t("no_update_found", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                        }
+                        
+                        Spacer(Modifier.height(32.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
+                                Text(t("current_version", languageSetting), fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Text(version, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                            }
+                            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(if(isNewer) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
+                                Text(t("new_version", languageSetting), fontSize = 11.sp, color = if(isNewer) MaterialTheme.colorScheme.primary else Color.Gray, fontWeight = FontWeight.Bold)
+                                Text(lr.version, fontSize = 18.sp, fontWeight = FontWeight.Black, color = if(isNewer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+
+                        if (lr.body.isNotBlank()) {
+                            Spacer(Modifier.height(32.dp))
+                            Text(t("changelog", languageSetting), fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                            Spacer(Modifier.height(8.dp))
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(16.dp).verticalScroll(rememberScrollState())) {
+                                MarkdownBody(lr.body)
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+
+                        if (isNewer) {
+                            Spacer(Modifier.height(24.dp))
+                            Button(
+                                onClick = {
+                                    showUpdatePanel = null
+                                    selectedFileForDialog = null
+                                    activeDownloads[fileName] = DownloadInfo(isDownloading = true)
+                                    globalScope.launch {
+                                        val newFileName = "${platform}_${owner}_${appName}_${lr.version}.apk"
+                                        val newFile = downloadApk(context, newFileName, lr.downloadUrl, if(platform=="GitHub") githubToken else codebergToken, languageSetting) {
+                                            activeDownloads[fileName] = DownloadInfo(progress = it, isDownloading = true)
+                                        }
+                                        if (newFile != null) {
+                                            file.delete()
+                                            activeDownloads.remove(fileName)
+                                            withContext(Dispatchers.Main) { refreshFiles() }
+                                        } else {
+                                            activeDownloads[fileName] = DownloadInfo(isDownloading = false)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(64.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Download, null)
+                                Spacer(Modifier.width(12.dp))
+                                Text(t("update_button", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                        }
+                    } else {
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Text(t("no_update_found", languageSetting), color = Color.Gray)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1879,6 +2128,15 @@ private suspend fun downloadApk(context: Context, fileName: String, url: String,
 }
 
 private fun installApk(context: Context, file: File) {
+    val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+    if (prefs.getBoolean("AUTO_DELETE_APK", false)) {
+        val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+        if (info != null) {
+            val mapping = prefs.getStringSet("APK_DELETE_MAPPING", emptySet())?.toMutableSet() ?: mutableSetOf()
+            mapping.add("${info.packageName}|${file.absolutePath}")
+            prefs.edit().putStringSet("APK_DELETE_MAPPING", mapping).apply()
+        }
+    }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
     context.startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/vnd.android.package-archive"); flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK })
 }

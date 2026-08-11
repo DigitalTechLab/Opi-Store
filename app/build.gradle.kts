@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.example.myapplication"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.opi.store"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 2
-        versionName = "1.9"
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
