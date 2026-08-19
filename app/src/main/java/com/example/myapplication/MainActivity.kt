@@ -1336,7 +1336,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
         val isDownloadingGlobal = downloadState.isDownloading
 
         LaunchedEffect(file, isDownloadingGlobal) {
-            if (!isDownloadingGlobal) {
+            if (!isDownloadingGlobal && file.exists()) {
                 currentFileValid = isApkValid(context, file)
             }
         }
@@ -1355,7 +1355,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                 Spacer(modifier = Modifier.height(16.dp)); Text(appName.ifBlank { file.name }, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
                 if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showUpdatePanel = file }) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 
-                if (!currentFileValid && !isDownloadingGlobal) {
+                if (!currentFileValid && !isDownloadingGlobal && file.exists()) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                         Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -1523,11 +1523,15 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                             activeDownloads[fileName] = DownloadInfo(progress = it, isDownloading = true)
                                         }
                                         if (newFile != null) {
+                                            val wasSelected = selectedFileForDialog == file
                                             file.delete()
-                                            activeDownloads.remove(fileName)
-                                            withContext(Dispatchers.Main) { refreshFiles() }
+                                            withContext(Dispatchers.Main) {
+                                                if (wasSelected) selectedFileForDialog = newFile
+                                                refreshFiles()
+                                                activeDownloads.remove(fileName)
+                                            }
                                         } else {
-                                            activeDownloads[fileName] = DownloadInfo(isDownloading = false)
+                                            activeDownloads.remove(fileName)
                                         }
                                     }
                                 },
@@ -3817,38 +3821,36 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
     var showTagSelector by remember { mutableStateOf(false) }
     var availableTags by remember { mutableStateOf<List<String>>(emptyList()) }
     var isDraggingOver by remember { mutableStateOf(false) }
+    var stagedAssetsToDelete by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var stagedUploads by remember { mutableStateOf<List<Pair<String, ByteArray>>>(emptyList()) }
+    var showCreateTagDialog by remember { mutableStateOf(false) }
+    var newTagNameInput by remember { mutableStateOf("") }
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+
+    BackHandler { onBack() }
 
     LaunchedEffect(Unit) {
         availableTags = fetchTags(token, repo.owner, repo.name, platform)
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) scope.launch {
-            isUploadingAsset = true
+        if (uri != null) {
             try {
                 val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
                 val fileName = uri.path?.substringAfterLast("/") ?: "upload_${System.currentTimeMillis()}.apk"
-                if (bytes != null && uploadReleaseAsset(repo.owner, repo.name, token, platform, release.id, fileName, bytes)) {
-                    Toast.makeText(context, t("uploaded", languageSetting), Toast.LENGTH_SHORT).show()
-                    val updatedReleases = fetchDetailedReleases(repo.owner, repo.name, token, platform)
-                    val current = updatedReleases.find { it.id == release.id }
-                    if (current != null) assets = current.assets
+                if (bytes != null) {
+                    stagedUploads = stagedUploads + (fileName to bytes)
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, t("no_access", languageSetting), Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                isUploadingAsset = false
+                Toast.makeText(context, t("no_access", languageSetting), Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     val dragScale by androidx.compose.animation.core.animateFloatAsState(if (isDraggingOver) 1.05f else 1f)
 
-    val hasChanges = tagName != release.tagName || releaseName != release.name || body != release.body
+    val hasChanges = tagName != release.tagName || releaseName != release.name || body != release.body || stagedAssetsToDelete.isNotEmpty() || stagedUploads.isNotEmpty()
 
     Scaffold(
         topBar = {
@@ -3866,8 +3868,20 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                             onClick = {
                                 isSaving = true
                                 scope.launch {
-                                    if (updateRelease(repo.owner, repo.name, token, platform, release.id, tagName, releaseName, body)) onBack()
-                                    else isSaving = false
+                                    val metadataSuccess = updateRelease(repo.owner, repo.name, token, platform, release.id, tagName, releaseName, body)
+                                    if (metadataSuccess) {
+                                        // Process deletions
+                                        stagedAssetsToDelete.forEach { assetId ->
+                                            deleteReleaseAsset(repo.owner, repo.name, token, platform, assetId)
+                                        }
+                                        // Process uploads
+                                        stagedUploads.forEach { (name, bytes) ->
+                                            uploadReleaseAsset(repo.owner, repo.name, token, platform, release.id, name, bytes)
+                                        }
+                                        onBack()
+                                    } else {
+                                        isSaving = false
+                                    }
                                 }
                             },
                             enabled = hasChanges
@@ -3920,6 +3934,11 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                             availableTags.forEach { tag ->
                                 DropdownMenuItem(text = { Text(tag) }, onClick = { tagName = tag; showTagSelector = false })
                             }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(if (languageSetting == "de") "Tag erstellen..." else "Create Tag...", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
+                                onClick = { showCreateTagDialog = true; showTagSelector = false }
+                            )
                         }
                     }
                     
@@ -4007,7 +4026,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
             
             Spacer(Modifier.height(16.dp))
             
-            assets.forEach { asset ->
+            assets.filter { it.id !in stagedAssetsToDelete }.forEach { asset ->
                 val isSource = asset.name.endsWith(".zip") || asset.name.endsWith(".tar.gz")
                 val isApk = asset.name.endsWith(".apk")
                 
@@ -4029,16 +4048,36 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                         trailingContent = {
                             if (!isSource) {
                                 IconButton(onClick = {
-                                    scope.launch {
-                                        if (deleteReleaseAsset(repo.owner, repo.name, token, platform, asset.id)) {
-                                            assets = assets.filter { it.id != asset.id }
-                                        }
-                                    }
+                                    stagedAssetsToDelete = stagedAssetsToDelete + asset.id
                                 }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
                             }
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
+                }
+            }
+
+            if (stagedUploads.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text(if (languageSetting == "de") "Geplante Uploads" else "Staged Uploads", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                stagedUploads.forEachIndexed { index, (name, bytes) ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                    ) {
+                        ListItem(
+                            headlineContent = { Text(name) },
+                            supportingContent = { Text("${bytes.size / 1024} KB (Staged)") },
+                            leadingContent = { Icon(Icons.Default.UploadFile, null, tint = MaterialTheme.colorScheme.primary) },
+                            trailingContent = {
+                                IconButton(onClick = {
+                                    stagedUploads = stagedUploads.filterIndexed { i, _ -> i != index }
+                                }) { Icon(Icons.Default.Close, null) }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
                 }
             }
             
@@ -4087,6 +4126,42 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                 }
             },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(t("cancel", languageSetting)) } }
+        )
+    }
+
+    if (showCreateTagDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateTagDialog = false },
+            title = { Text(if (languageSetting == "de") "Neuen Tag erstellen" else "Create New Tag") },
+            text = {
+                Column {
+                    Text(if (languageSetting == "de") "Geben Sie einen Namen für den neuen Tag ein:" else "Enter a name for the new tag:")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newTagNameInput,
+                        onValueChange = { newTagNameInput = it },
+                        label = { Text("Tag Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newTagNameInput.isNotBlank()) {
+                            tagName = newTagNameInput
+                            availableTags = availableTags + newTagNameInput
+                            showCreateTagDialog = false
+                            newTagNameInput = ""
+                        }
+                    },
+                    enabled = newTagNameInput.isNotBlank()
+                ) { Text(if (languageSetting == "de") "Erstellen" else "Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateTagDialog = false }) { Text(t("cancel", languageSetting)) }
+            }
         )
     }
 }
