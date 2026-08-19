@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opi-Store — Official Mobile App</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="background-glow"></div>
+
+<header class="hero-section">
+    <div class="hero-content">
+        <div class="app-icon-wrapper">
+            <img src="Photos/Logo.png" alt="Opi-Store Logo" class="app-icon" onerror="this.onerror=null; this.src='Logo.png';">
+        </div>
+
+        <h1 class="hero-title">Opi-Store</h1>
+        <p class="hero-subtitle">The seamless, modern store experience for Android. Download the latest version directly to your device.</p>
+
+        <div class="download-card">
+            <div class="status-container">
+                <span id="status-dot" class="status-dot pulse"></span>
+                <span id="status-text">Fetching latest version...</span>
+            </div>
+
+            <button id="open-download-page-btn" class="btn disabled">
+                <svg class="download-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Download</span>
+            </button>
+
+            <div class="meta-info">
+                <div class="meta-item">
+                    <span class="meta-label">Version</span>
+                    <span id="version-tag" class="meta-value">--</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">File Size</span>
+                    <span id="file-size" class="meta-value">--</span>
+                </div>
+            </div>
+        </div>
+
+        <a href="#simulator" class="scroll-indicator">
+            <span>Explore the App</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </a>
+    </div>
+</header>
+
+<section id="simulator" class="simulator-section">
+    <div class="simulator-header">
+        <h2 class="section-title">Interactive Preview</h2>
+        <p class="section-subtitle">Click through the screens to experience the app before downloading.</p>
+    </div>
+
+    <div class="smartphone-container">
+        <div class="smartphone-frame">
+            <button id="fullscreen-btn" class="fullscreen-btn" title="Toggle Fullscreen">
+                <svg id="icon-expand" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                <svg id="icon-compress" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+            </button>
+
+            <div class="screen-container">
+                <img id="app-preview-image" src="Photos/Photo1.jpg" alt="App Preview" onerror="this.onerror=null; this.src='Photos/Photo1.png';">
+            </div>
+
+            <div id="start-hint" class="start-hint">
+                <div class="hint-pulse"></div>
+                <svg class="hint-finger" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a2 2 0 0 1 2 2v7h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-4.58l-1.6-1.6a2 2 0 0 1 2.82-2.82l1.78 1.78V4a2 2 0 0 1 2-2z" />
+                </svg>
+                <div class="hint-text">Click to Start</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="about-section">
+    <div class="about-content">
+        <h2 class="about-title">What is Opi-Store?</h2>
+        <p class="about-description">
+            This is an open source app store where you can browse apps on Github, Gitlab and Codeberg, filtered to only show apk files. Because of the limits for sending requests to the Github and Codeberg server, you can login with your account token. You can create and edit your repositorys too. There's an extra code editor for your repos to change things quickly!
+        </p>
+    </div>
+</footer>
+
+<div id="download-page" class="download-page">
+    <div class="download-page-content">
+        <button id="close-download-page" class="back-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Site
+        </button>
+
+        <h2 class="page-title">Installation Guide</h2>
+        <p class="page-subtitle">Follow these 4 simple steps to install the app on your device.</p>
+
+        <div class="steps-container">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <div class="step-details">
+                    <h3>Download</h3>
+                    <p>Get the official installation file directly to your device.</p>
+                    <a id="real-download-btn" class="btn small-btn disabled" href="#" download>
+                        <svg class="download-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Download APK</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <div class="step-details">
+                    <h3>Open File</h3>
+                    <p>Open your file manager and click on the downloaded file.</p>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <div class="step-details">
+                    <h3>Install</h3>
+                    <p>Click on <strong>"Install"</strong> when the Android prompt appears.</p>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <div class="step-details">
+                    <h3>Bypass Warning</h3>
+                    <p>If prompted by Play Protect, click on "More details" and then <strong>"Install anyway"</strong>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="fullscreen-overlay" class="fullscreen-overlay"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
