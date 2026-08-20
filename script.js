@@ -86,11 +86,11 @@ appImage.addEventListener('click', (e) => {
   const y = (e.clientY - rect.top) / rect.height * 100;
 
   if (appImage.src.includes('Photo1.jpg') || appImage.src.includes('Photo1.png')) {
-    if (x >= 30 && x <= 70 && y >= 65 && y <= 85) {
+    if (x >= 25 && x <= 75 && y >= 60 && y <= 90) {
       changeAppScreen('Photos/Photo3.jpg');
     }
   } else {
-    if (y >= 85 && y <= 99) {
+    if (y >= 80 && y <= 100) {
       if (x >= 0 && x <= 25) changeAppScreen('Photos/Photo3.jpg');
       else if (x > 25 && x <= 50) changeAppScreen('Photos/Photo4.jpg');
       else if (x > 50 && x <= 75) changeAppScreen('Photos/Photo2.jpg');
@@ -103,17 +103,20 @@ let isFullscreen = false;
 
 function toggleFullscreen() {
   if (!isFullscreen) {
+    const isMobile = window.innerWidth <= 600;
     const rect = smartphoneFrame.getBoundingClientRect();
     const winWidth = window.innerWidth;
     const winHeight = window.innerHeight;
+
     const frameCenterX = rect.left + (rect.width / 2);
     const frameCenterY = rect.top + (rect.height / 2);
 
     const translateX = (winWidth / 2) - frameCenterX;
     const translateY = (winHeight / 2) - frameCenterY;
 
-    const scaleX = (winWidth - 40) / rect.width;
-    const scaleY = (winHeight - 40) / rect.height;
+    const margin = isMobile ? 10 : 40;
+    const scaleX = (winWidth - margin) / rect.width;
+    const scaleY = (winHeight - margin) / rect.height;
     const scale = Math.min(scaleX, scaleY);
 
     smartphoneFrame.classList.add('is-fullscreen');
