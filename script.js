@@ -119,14 +119,13 @@ function toggleFullscreen() {
     const scaleY = (winHeight - margin) / rect.height;
     const scale = Math.min(scaleX, scaleY);
 
+    smartphoneFrame.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
     smartphoneFrame.classList.add('is-fullscreen');
     document.body.classList.add('fullscreen-active');
     fullscreenOverlay.classList.add('active');
     iconExpand.style.display = 'none';
     iconCompress.style.display = 'block';
     document.body.style.overflow = 'hidden';
-
-    smartphoneFrame.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
     isFullscreen = true;
   } else {
     smartphoneFrame.classList.remove('is-fullscreen');
@@ -135,7 +134,6 @@ function toggleFullscreen() {
     iconExpand.style.display = 'block';
     iconCompress.style.display = 'none';
     document.body.style.overflow = '';
-
     smartphoneFrame.style.transform = '';
     isFullscreen = false;
   }
