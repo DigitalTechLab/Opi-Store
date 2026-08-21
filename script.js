@@ -7,8 +7,6 @@ const closeDownloadPageBtn = document.getElementById('close-download-page');
 const downloadPage = document.getElementById('download-page');
 const realDownloadBtn = document.getElementById('real-download-btn');
 
-const statusText = document.getElementById('status-text');
-const statusDot = document.getElementById('status-dot');
 const versionTag = document.getElementById('version-tag');
 const fileSize = document.getElementById('file-size');
 const appImage = document.getElementById('app-preview-image');
@@ -43,18 +41,11 @@ async function fetchLatestRelease() {
       realDownloadBtn.classList.remove('disabled');
       openDownloadPageBtn.classList.remove('disabled');
 
-      statusText.innerText = 'Ready to install';
-      statusDot.classList.remove('pulse');
-      statusDot.classList.add('active');
       versionTag.innerText = data.tag_name || 'Latest';
       fileSize.innerText = formatBytes(apkAsset.size);
-    } else {
-      statusText.innerText = 'No APK found in the latest release.';
-      statusDot.classList.remove('pulse');
     }
   } catch (error) {
-    statusText.innerText = 'Unable to fetch version data.';
-    statusDot.classList.remove('pulse');
+    console.error("Unable to fetch version data.");
   }
 }
 

@@ -164,6 +164,26 @@ body.fullscreen-active .hero-section {
   box-shadow: none;
 }
 
+.btn-github {
+  background: transparent !important;
+  border: none !important;
+  margin-top: 20px;
+  box-shadow: none !important;
+  color: var(--text-muted) !important;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: none !important;
+  text-decoration: none;
+}
+
+.btn-github:hover {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .download-icon { width: 22px; height: 22px; }
 
 .meta-info {
