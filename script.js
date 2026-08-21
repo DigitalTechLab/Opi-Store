@@ -1,6 +1,6 @@
 const REPO_OWNER = 'DigitalTechLab';
 const REPO_NAME = 'Opi-Store';
-const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
+const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases`;
 
 const openDownloadPageBtn = document.getElementById('open-download-page-btn');
 const closeDownloadPageBtn = document.getElementById('close-download-page');
@@ -9,6 +9,7 @@ const realDownloadBtn = document.getElementById('real-download-btn');
 
 const versionTag = document.getElementById('version-tag');
 const fileSize = document.getElementById('file-size');
+const totalDownloadsTag = document.getElementById('total-downloads');
 const appImage = document.getElementById('app-preview-image');
 const startHint = document.getElementById('start-hint');
 
@@ -27,25 +28,43 @@ function formatBytes(bytes, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-async function fetchLatestRelease() {
+async function fetchRepoStats() {
   try {
     const response = await fetch(API_URL);
     if (!response.ok) throw new Error(`Status ${response.status}`);
 
-    const data = await response.json();
-    const assets = data.assets || [];
-    const apkAsset = assets.find(asset => asset.name.endsWith('.apk'));
+    const releases = await response.json();
+    if (releases.length === 0) return;
 
-    if (apkAsset) {
-      realDownloadBtn.href = apkAsset.browser_download_url;
+    // Latest release info (first item in array)
+    const latestRelease = releases[0];
+    const latestAssets = latestRelease.assets || [];
+    const latestApk = latestAssets.find(asset => asset.name.endsWith('.apk'));
+
+    if (latestApk) {
+      realDownloadBtn.href = latestApk.browser_download_url;
       realDownloadBtn.classList.remove('disabled');
       openDownloadPageBtn.classList.remove('disabled');
 
-      versionTag.innerText = data.tag_name || 'Latest';
-      fileSize.innerText = formatBytes(apkAsset.size);
+      versionTag.innerText = latestRelease.tag_name || 'Latest';
+      fileSize.innerText = formatBytes(latestApk.size);
     }
+
+    // Calculate total downloads from all releases
+    let totalDownloads = 0;
+    releases.forEach(release => {
+      release.assets.forEach(asset => {
+        if (asset.name.endsWith('.apk')) {
+          totalDownloads += asset.download_count;
+        }
+      });
+    });
+
+    totalDownloadsTag.innerText = totalDownloads.toLocaleString();
+
   } catch (error) {
-    console.error("Unable to fetch version data.");
+    console.error("Unable to fetch repository stats.");
+    totalDownloadsTag.innerText = "Error";
   }
 }
 
@@ -139,4 +158,4 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isFullscreen) toggleFullscreen();
 });
 
-document.addEventListener('DOMContentLoaded', fetchLatestRelease);
+document.addEventListener('DOMContentLoaded', fetchRepoStats);

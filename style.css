@@ -196,6 +196,7 @@ body.fullscreen-active .hero-section {
 }
 
 .meta-item { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.meta-item:nth-child(2) { text-align: center; }
 .meta-item:last-child { text-align: right; }
 .meta-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .meta-value { font-size: 1rem; font-weight: 600; color: var(--text-main); }
