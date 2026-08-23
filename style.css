@@ -559,3 +559,59 @@ body.fullscreen-active .about-section {
   width: auto;
   display: inline-flex;
 }
+
+@media (max-width: 600px) {
+  .download-page {
+    padding: 15px 15px;
+  }
+
+  .download-page-content {
+    animation: none; /* Faster appearance */
+  }
+
+  .back-btn {
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.85rem;
+    margin-bottom: 15px;
+  }
+
+  .steps-container {
+    gap: 8px;
+  }
+
+  .step-card {
+    padding: 12px;
+    gap: 12px;
+    border-radius: 16px;
+  }
+
+  .step-number {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+  }
+
+  .step-details h3 {
+    font-size: 1rem;
+    margin-bottom: 2px;
+  }
+
+  .step-details p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .small-btn {
+    margin-top: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+}
