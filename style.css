@@ -287,6 +287,35 @@ body.fullscreen-active .simulator-header {
   line-height: 0;
 }
 
+.stars-overlay {
+  position: absolute;
+  top: 63.13%; /* (1392 / 2205) */
+  right: 6.2%;  /* (1080 - 1013) / 1080 */
+  height: 2.54%; /* (56 / 2205) */
+  background-color: #49454f;
+  display: none; /* Only show on Photo2 */
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 6px;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 11px;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+.star-icon {
+  width: 12px;
+  height: 12px;
+  color: #ffca28; /* Golden Yellow */
+}
+
+.stars-overlay.active {
+  display: flex;
+}
+
 .smartphone-frame:not(.is-fullscreen):hover {
   transform: translateY(-5px);
 }

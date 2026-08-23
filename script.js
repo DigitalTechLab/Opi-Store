@@ -1,6 +1,7 @@
 const REPO_OWNER = 'DigitalTechLab';
 const REPO_NAME = 'Opi-Store';
 const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases`;
+const REPO_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
 
 const openDownloadPageBtn = document.getElementById('open-download-page-btn');
 const closeDownloadPageBtn = document.getElementById('close-download-page');
@@ -11,6 +12,8 @@ const versionTag = document.getElementById('version-tag');
 const fileSize = document.getElementById('file-size');
 const totalDownloadsTag = document.getElementById('total-downloads');
 const appImage = document.getElementById('app-preview-image');
+const starsOverlay = document.getElementById('stars-overlay');
+const starsCount = document.getElementById('stars-count');
 const startHint = document.getElementById('start-hint');
 
 const fullscreenBtn = document.getElementById('fullscreen-btn');
@@ -95,6 +98,13 @@ async function fetchRepoStats() {
     });
 
     totalDownloadsTag.innerText = totalDownloads.toLocaleString();
+
+    // Fetch Star Count
+    const repoResponse = await fetch(REPO_API_URL);
+    if (repoResponse.ok) {
+        const repoData = await repoResponse.json();
+        starsCount.innerText = repoData.stargazers_count;
+    }
   } catch (error) {
     console.error("Unable to fetch repository stats.");
     totalDownloadsTag.innerText = "Error";
@@ -116,6 +126,13 @@ closeDownloadPageBtn.addEventListener('click', () => {
 
 window.changeAppScreen = function(newSrc) {
   appImage.src = newSrc;
+
+  if (newSrc.includes('Photo2')) {
+    starsOverlay.classList.add('active');
+  } else {
+    starsOverlay.classList.remove('active');
+  }
+
   if (!newSrc.includes('Photo1')) {
     if (startHint) startHint.style.opacity = '0';
   } else {
