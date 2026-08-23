@@ -506,7 +506,7 @@ body.fullscreen-active .about-section {
 .page-subtitle {
   color: var(--text-muted);
   font-size: 1rem;
-  margin-bottom: 40px;
+  margin-bottom: 25px;
 }
 
 .steps-container {
@@ -562,7 +562,7 @@ body.fullscreen-active .about-section {
 
 @media (max-width: 600px) {
   .download-page {
-    padding: 15px 15px;
+    padding: 25px 15px;
   }
 
   .download-page-content {
@@ -570,48 +570,49 @@ body.fullscreen-active .about-section {
   }
 
   .back-btn {
-    margin-bottom: 12px;
-    font-size: 0.9rem;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.7rem;
+    margin-bottom: 5px;
   }
 
   .page-subtitle {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     margin-bottom: 15px;
   }
 
   .steps-container {
-    gap: 8px;
+    gap: 12px;
   }
 
   .step-card {
-    padding: 12px;
-    gap: 12px;
-    border-radius: 16px;
+    padding: 16px;
+    gap: 16px;
+    border-radius: 18px;
   }
 
   .step-number {
-    width: 28px;
-    height: 28px;
-    font-size: 0.9rem;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
   }
 
   .step-details h3 {
-    font-size: 1rem;
-    margin-bottom: 2px;
+    font-size: 1.05rem;
+    margin-bottom: 4px;
   }
 
   .step-details p {
-    font-size: 0.8rem;
-    line-height: 1.4;
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
 
   .small-btn {
-    margin-top: 8px;
-    padding: 8px 14px;
-    font-size: 0.85rem;
+    margin-top: 12px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
   }
 }
