@@ -145,16 +145,36 @@ appImage.addEventListener('click', (e) => {
   const x = (e.clientX - rect.left) / rect.width * 100;
   const y = (e.clientY - rect.top) / rect.height * 100;
 
-  if (appImage.src.includes('Photo1.jpg') || appImage.src.includes('Photo1.png')) {
+  const currentSrc = appImage.src;
+
+  // Screen 1: Start Button
+  if (currentSrc.includes('Photo1')) {
     if (x >= 25 && x <= 75 && y >= 60 && y <= 90) {
       changeAppScreen('Photos/Photo3.jpg');
     }
-  } else {
-    if (y >= 80 && y <= 100) {
-      if (x >= 0 && x <= 25) changeAppScreen('Photos/Photo3.jpg');
-      else if (x > 25 && x <= 50) changeAppScreen('Photos/Photo4.jpg');
-      else if (x > 50 && x <= 75) changeAppScreen('Photos/Photo2.jpg');
-      else if (x > 75 && x <= 100) changeAppScreen('Photos/Photo5.jpg');
+    return;
+  }
+
+  // Bottom Navigation (for Screens 2-6)
+  if (y >= 80 && y <= 100) {
+    if (x >= 0 && x <= 25) changeAppScreen('Photos/Photo3.jpg');
+    else if (x > 25 && x <= 50) changeAppScreen('Photos/Photo4.jpg');
+    else if (x > 50 && x <= 75) changeAppScreen('Photos/Photo2.jpg');
+    else if (x > 75 && x <= 100) changeAppScreen('Photos/Photo5.jpg');
+    return;
+  }
+
+  // Screen 2 Specific: Go to Screen 6 (Codeberg Tab)
+  if (currentSrc.includes('Photo2')) {
+    if (x >= 50 && x <= 94 && y >= 5 && y <= 12) {
+      changeAppScreen('Photos/Photo6.jpg');
+    }
+  }
+
+  // Screen 6 Specific: Go back to Screen 2 (My Repositorys Tab)
+  if (currentSrc.includes('Photo6')) {
+    if (x >= 6 && x <= 50 && y >= 5 && y <= 12) {
+      changeAppScreen('Photos/Photo2.jpg');
     }
   }
 });
