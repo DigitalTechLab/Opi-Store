@@ -12,7 +12,7 @@ android {
         minSdk = 23
         targetSdk = 37
         versionCode = 2
-        versionName = "2.2"
+        versionName = "2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -42,10 +42,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.appcompat:appcompat:1.8.0")
 
-    // Icons, Netzwerk (OkHttp) & Bilder-Laden (Coil)
+    // Icons, Netzwerk (OkHttp) & Bilder-Laden (Coil 3.0)
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("com.squareup.okhttp3:okhttp:5.4.0")
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

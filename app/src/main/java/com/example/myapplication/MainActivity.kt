@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,7 +65,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
+import com.example.myapplication.ui.theme.MyApplicationTheme
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -99,6 +101,7 @@ data class PullRequest(val id: String, val number: Int, val title: String, val b
 data class RepoStats(val stars: Int, val forks: Int, val watchers: Int, val language: String, val createdAt: String)
 data class ReleaseAsset(val id: String, val name: String, val downloadUrl: String, val size: Long, val downloadCount: Int)
 data class FullRelease(val id: String, val tagName: String, val name: String, val body: String, val isPreRelease: Boolean, val assets: List<ReleaseAsset>, val htmlUrl: String)
+data class InstalledApp(val packageName: String, val label: String, val version: String, val icon: Drawable?, val platform: String, val owner: String, val appName: String)
 
 
 private fun t(key: String, lang: String): String {
@@ -255,6 +258,16 @@ private fun t(key: String, lang: String): String {
         "delete_release_confirm" -> if (isDe) "Möchtest du diesen Release wirklich löschen?" else "Do you really want to delete this release?"
         "edit_changelog" -> if (isDe) "Beschreibung bearbeiten" else "Edit Description"
         "select_tag" -> if (isDe) "Tag auswählen" else "Select Tag"
+        "accent_color" -> if (isDe) "Akzentfarbe" else "Accent Color"
+        "accent_blue" -> if (isDe) "Blau" else "Blue"
+        "accent_green" -> if (isDe) "Grün" else "Green"
+        "accent_red" -> if (isDe) "Rot" else "Red"
+        "accent_standard" -> if (isDe) "Standard" else "Standard"
+        "tab_apks" -> "APKs"
+        "tab_apps" -> "Apps"
+        "open_app" -> if (isDe) "Öffnen" else "Open"
+        "uninstall" -> if (isDe) "Deinstallieren" else "Uninstall"
+        "update_notice" -> if (isDe) "Update verfügbar!" else "Update available!"
         else -> key
     }
 }
@@ -265,14 +278,15 @@ class MainActivity : AppCompatActivity() {
         val sharedPrefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
         setContent {
             val themeSetting = remember { mutableStateOf(sharedPrefs.getString("THEME_SETTING", "System") ?: "System") }
+            val accentColorSetting = remember { mutableStateOf(sharedPrefs.getString("ACCENT_COLOR_SETTING", "Standard") ?: "Standard") }
             val isDarkTheme = when (themeSetting.value) {
                 "Light" -> false
                 "Dark" -> true
                 else -> androidx.compose.foundation.isSystemInDarkTheme()
             }
-            MaterialTheme(colorScheme = if (isDarkTheme) darkColorScheme() else lightColorScheme()) {
+            MyApplicationTheme(darkTheme = isDarkTheme, accentColor = accentColorSetting.value, dynamicColor = false) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    OpenSourceStoreApp(sharedPrefs, themeSetting)
+                    OpenSourceStoreApp(sharedPrefs, themeSetting, accentColorSetting)
                 }
             }
         }
@@ -280,7 +294,10 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Composable
-fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSetting: MutableState<String>) {
+fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSetting: MutableState<String>, accentColorSetting: MutableState<String>) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var githubToken by rememberSaveable { mutableStateOf(sharedPrefs.getString("GITHUB_TOKEN", "") ?: "") }
     var codebergToken by rememberSaveable { mutableStateOf(sharedPrefs.getString("CODEBERG_TOKEN", "") ?: "") }
@@ -297,8 +314,6 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
     var showUpdateScreen by remember { mutableStateOf<AppRelease?>(null) }
 
     val activeDownloads = remember { mutableStateMapOf<String, DownloadInfo>() }
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         try {
@@ -514,6 +529,8 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
                     3 -> SettingsScreen(
                         currentTheme = themeSetting.value,
                         onThemeChange = { themeSetting.value = it; sharedPrefs.edit().putString("THEME_SETTING", it).apply() },
+                        currentAccentColor = accentColorSetting.value,
+                        onAccentColorChange = { accentColorSetting.value = it; sharedPrefs.edit().putString("ACCENT_COLOR_SETTING", it).apply() },
                         currentLanguage = languageSetting,
                         onLanguageChange = { languageSetting = it; sharedPrefs.edit().putString("LANGUAGE_SETTING", it).apply() },
                         updatesEnabled = updatesEnabled,
@@ -532,6 +549,8 @@ fun OpenSourceStoreApp(sharedPrefs: android.content.SharedPreferences, themeSett
 fun SettingsScreen(
     currentTheme: String,
     onThemeChange: (String) -> Unit,
+    currentAccentColor: String,
+    onAccentColorChange: (String) -> Unit,
     currentLanguage: String,
     onLanguageChange: (String) -> Unit,
     updatesEnabled: Boolean,
@@ -541,6 +560,7 @@ fun SettingsScreen(
     languageSetting: String
 ) {
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showAccentDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showAutoDeleteDialog by remember { mutableStateOf(false) }
@@ -587,6 +607,37 @@ fun SettingsScreen(
                     else -> currentTheme
                 }
                 Text(themeLabel, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Accent Color Button
+        Button(
+            onClick = { showAccentDialog = true },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ColorLens, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text(t("accent_color", languageSetting), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                }
+                val accentLabel = when(currentAccentColor) {
+                    "Standard" -> t("accent_standard", languageSetting)
+                    "Blue" -> t("accent_blue", languageSetting)
+                    "Green" -> t("accent_green", languageSetting)
+                    "Red" -> t("accent_red", languageSetting)
+                    else -> currentAccentColor
+                }
+                Text(accentLabel, color = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -675,6 +726,35 @@ fun SettingsScreen(
                 Text(if (autoDeleteApk) t("on", languageSetting) else t("off", languageSetting), color = MaterialTheme.colorScheme.primary)
             }
         }
+    }
+
+    if (showAccentDialog) {
+        AlertDialog(
+            onDismissRequest = { showAccentDialog = false },
+            title = { Text(t("accent_color", languageSetting)) },
+            text = {
+                Column {
+                    listOf("Standard", "Blue", "Green", "Red").forEach { color ->
+                        val colorLabel = when(color) {
+                            "Standard" -> t("accent_standard", languageSetting)
+                            "Blue" -> t("accent_blue", languageSetting)
+                            "Green" -> t("accent_green", languageSetting)
+                            "Red" -> t("accent_red", languageSetting)
+                            else -> color
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onAccentColorChange(color); showAccentDialog = false }.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = currentAccentColor == color, onClick = { onAccentColorChange(color); showAccentDialog = false })
+                            Spacer(Modifier.width(12.dp))
+                            Text(colorLabel)
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
     }
 
     if (showThemeDialog) {
@@ -795,7 +875,7 @@ fun AccountMultiScreen(githubToken: String, codebergToken: String, onGithubToken
             if (selectedPlatform == 0) {
                 AccountScreenDetails(token = githubToken, platformName = "GitHub", onTokenSaved = onGithubTokenSaved, fetchProfile = { fetchGitHubProfile(it) }, fetchRepos = { fetchUserRepos(it, "https://api.github.com/user/repos") }, fetchStarred = { fetchUserRepos(it, "https://api.github.com/user/starred") }, updateProfile = { t, n, b -> updateGitHubProfile(t, n, b) }, onUsernameClick = onUsernameClick, languageSetting = languageSetting, onAppSelected = onAppSelected)
             } else {
-                AccountScreenDetails(token = codebergToken, platformName = "Codeberg", onTokenSaved = onCodebergTokenSaved, fetchProfile = { fetchCodebergProfile(it) }, fetchRepos = { fetchUserRepos(it, "https://codeberg.org/api/v1/user/repos") }, fetchStarred = { fetchUserRepos(it, "https://api.github.com/user/starred") }, updateProfile = { t, n, b -> updateCodebergProfile(t, n, b) }, onUsernameClick = onUsernameClick, languageSetting = languageSetting, onAppSelected = onAppSelected)
+                AccountScreenDetails(token = codebergToken, platformName = "Codeberg", onTokenSaved = onCodebergTokenSaved, fetchProfile = { fetchCodebergProfile(it) }, fetchRepos = { fetchUserRepos(it, "https://codeberg.org/api/v1/user/repos") }, fetchStarred = { fetchUserRepos(it, "https://codeberg.org/api/v1/user/starred") }, updateProfile = { t, n, b -> updateCodebergProfile(t, n, b) }, onUsernameClick = onUsernameClick, languageSetting = languageSetting, onAppSelected = onAppSelected)
             }
         }
     }
@@ -1100,6 +1180,18 @@ fun AppDetailFullScreen(
     var showImageZoom by remember { mutableStateOf(false) }
     var isPrefetchingSource by remember { mutableStateOf(false) }
 
+    var isStarred by remember { mutableStateOf(false) }
+    var isCheckingStar by remember { mutableStateOf(false) }
+
+    LaunchedEffect(app) {
+        val token = if (app.platform == "GitHub") githubToken else codebergToken
+        if (token.isNotBlank()) {
+            isCheckingStar = true
+            isStarred = checkRepoStarred(token, app.owner, app.name, app.platform)
+            isCheckingStar = false
+        }
+    }
+
     LaunchedEffect(app) {
         if (app.preFetchedReleases != null) {
             releases = app.preFetchedReleases
@@ -1147,7 +1239,31 @@ fun AppDetailFullScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp, vertical = 16.dp)) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState), horizontalAlignment = Alignment.CenterHorizontally) {
                 AsyncImage(model = app.avatarUrl, contentDescription = "Logo", contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).clip(CircleShape).clickable { showImageZoom = true })
-                Spacer(modifier = Modifier.height(16.dp)); Text(text = app.name, fontWeight = FontWeight.Bold, fontSize = 28.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = app.name, fontWeight = FontWeight.Bold, fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val token = if (app.platform == "GitHub") githubToken else codebergToken
+                    if (token.isNotBlank()) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                val success = toggleRepoStar(token, app.owner, app.name, app.platform, isStarred)
+                                if (success) isStarred = !isStarred
+                            }
+                        }, modifier = Modifier.size(32.dp), enabled = !isCheckingStar) {
+                            if (isCheckingStar) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    imageVector = if (isStarred) Icons.Default.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = "Star",
+                                    tint = if (isStarred) Color(0xFFFFD700) else Color.Gray,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -1313,15 +1429,57 @@ fun VersionItem(release: AppRelease, isSelected: Boolean, onClick: () -> Unit) {
 @Composable
 fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting: String, activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope, refreshTrigger: Int) {
     val context = LocalContext.current
-    var downloadedFiles by remember { mutableStateOf<List<File>>(emptyList()) }
-    var selectedFileForDialog by remember { mutableStateOf<File?>(null) }
+    var selectedSubTab by rememberSaveable { mutableIntStateOf(0) } // 0 = APKs, 1 = Apps
+    
+    var downloadedFiles by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
+    var installedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
+    var isDataReady by remember { mutableStateOf(false) }
+    
+    var selectedFileForDialog by remember { mutableStateOf<java.io.File?>(null) }
+    var selectedAppForDialog by remember { mutableStateOf<InstalledApp?>(null) }
+    
     var isRepairingLocal by remember { mutableStateOf(false) }
     var repairProgressLocal by remember { mutableStateOf("") }
     var currentFileValid by remember { mutableStateOf(true) }
-    var showUpdatePanel by remember { mutableStateOf<File?>(null) }
+    var showUpdatePanel by remember { mutableStateOf<java.io.File?>(null) }
+    var showAppUpdatePanel by remember { mutableStateOf<InstalledApp?>(null) }
 
-    fun refreshFiles() { val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS); downloadedFiles = dir?.listFiles { _, name -> name.endsWith(".apk") && name != "update.apk" }?.toList() ?: emptyList() }
-    LaunchedEffect(Unit, refreshTrigger) { refreshFiles() }
+    suspend fun refreshFiles() = withContext(Dispatchers.IO) { 
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val files = dir?.listFiles { _, name -> name.endsWith(".apk") && name != "update.apk" }?.toList() ?: emptyList()
+        withContext(Dispatchers.Main) { downloadedFiles = files }
+    }
+    
+    suspend fun refreshInstalledApps() = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        val mapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet()) ?: emptySet()
+        val appList = mutableListOf<InstalledApp>()
+        
+        mapping.forEach { entry ->
+            val parts = entry.split("|")
+            if (parts.size == 4) {
+                val pkg = parts[0]
+                val platform = parts[1]
+                val owner = parts[2]
+                val appName = parts[3]
+                try {
+                    val info = pm.getPackageInfo(pkg, 0)
+                    val label = info.applicationInfo?.loadLabel(pm)?.toString() ?: pkg
+                    val version = info.versionName ?: ""
+                    val icon = info.applicationInfo?.loadIcon(pm)
+                    appList.add(InstalledApp(pkg, label, version, icon, platform, owner, appName))
+                } catch (e: Exception) {}
+            }
+        }
+        withContext(Dispatchers.Main) { installedApps = appList }
+    }
+    
+    LaunchedEffect(refreshTrigger, selectedSubTab) { 
+        isDataReady = false
+        if (selectedSubTab == 0) refreshFiles() else refreshInstalledApps()
+        isDataReady = true
+    }
 
     if (selectedFileForDialog != null) {
         val file = selectedFileForDialog!!
@@ -1384,48 +1542,204 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                 isRepairingLocal = false
                                 activeDownloads[fileName] = DownloadInfo(isDownloading = false, isDownloaded = success)
                                 currentFileValid = isApkValid(context, file)
-                                if (success) { refreshFiles() }
+                                if (success) { globalScope.launch { refreshFiles() } }
                             }
                         }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA000))) {
                             Icon(Icons.Default.Build, null); Spacer(modifier = Modifier.width(10.dp)); Text(t("repair", languageSetting), fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp)); TextButton(onClick = { file.delete(); refreshFiles(); selectedFileForDialog = null }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF5350))) { Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("delete_apk", languageSetting), fontWeight = FontWeight.Medium) }
+                    Spacer(modifier = Modifier.height(12.dp)); TextButton(onClick = { file.delete(); globalScope.launch { refreshFiles() }; selectedFileForDialog = null }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF5350))) { Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("delete_apk", languageSetting), fontWeight = FontWeight.Medium) }
                 }
             }
         })
     }
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text(t("apk_manager_title", languageSetting), fontSize = 18.sp, fontWeight = FontWeight.Bold); Text(t("apk_manager_subtitle", languageSetting), fontSize = 12.sp, color = Color.Gray); Spacer(modifier = Modifier.height(16.dp))
-        if (downloadedFiles.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apks_downloaded", languageSetting)) }
-        else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(downloadedFiles) { file ->
-            val fileName = file.name
-            val parts = fileName.removeSuffix(".apk").split("_")
-            val isDownloading = activeDownloads[fileName]?.isDownloading == true
-            val isValid = if (isDownloading) true else isApkValid(context, file)
-            val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
-            val apkIcon = remember(file) { if (isValid && !isDownloading) getApkIcon(context, file) else null }
-            Card(modifier = Modifier.fillMaxWidth().clickable { selectedFileForDialog = file }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
-                    if (apkIcon != null) {
-                        AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else if (avatarUrl != null) {
-                        AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+
+    if (selectedAppForDialog != null) {
+        val app = selectedAppForDialog!!
+        AlertDialog(onDismissRequest = { selectedAppForDialog = null }, confirmButton = {}, title = null, text = {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                IconButton(
+                    onClick = {
+                        val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                        val metaMapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet())?.toMutableSet() ?: mutableSetOf()
+                        metaMapping.removeAll { it.startsWith("${app.packageName}|") }
+                        prefs.edit().putStringSet("INSTALLED_APPS_META", metaMapping).apply()
+                        selectedAppForDialog = null
+                        globalScope.launch { refreshInstalledApps() }
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = (-12).dp)
+                ) {
+                    Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                }
+                
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (app.icon != null) {
+                        AsyncImage(model = app.icon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
                     } else {
-                        Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                        Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp)); Text(app.label, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
+                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showAppUpdatePanel = app }) { 
+                        Text("${t("version", languageSetting)} ${app.version}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) 
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Button(onClick = { 
+                        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                        if (intent != null) context.startActivity(intent)
+                        selectedAppForDialog = null 
+                    }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { 
+                        Icon(Icons.Default.Launch, null); Spacer(modifier = Modifier.width(10.dp)); Text(t("open_app", languageSetting), fontWeight = FontWeight.Bold) 
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp)); 
+                    TextButton(onClick = { 
+                        val intent = Intent(Intent.ACTION_DELETE).apply {
+                            data = android.net.Uri.parse("package:${app.packageName}")
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                        selectedAppForDialog = null 
+                    }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF5350))) { 
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("uninstall", languageSetting), fontWeight = FontWeight.Medium) 
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(parts.getOrNull(2) ?: file.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
-                    if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp) }
+            }
+        })
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                Text(t("apk_manager_title", languageSetting), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(t("apk_manager_subtitle", languageSetting), fontSize = 12.sp, color = Color.Gray)
+            }
+            
+            // Tiny selection buttons like in Account tab
+            Row(
+                modifier = Modifier
+                    .width(160.dp)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Surface(
+                    onClick = { selectedSubTab = 0 },
+                    color = if (selectedSubTab == 0) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(19.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(t("tab_apks", languageSetting), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (selectedSubTab == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                    }
                 }
-                Text(if (isDownloading) activeDownloads[fileName]?.progress ?: "" else "${file.length() / (1024 * 1024)} MB", fontSize = 12.sp, color = Color.Gray)
-            }; Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
-            } }
-        } }
+                Surface(
+                    onClick = { selectedSubTab = 1 },
+                    color = if (selectedSubTab == 1) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(19.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(t("tab_apps", languageSetting), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (selectedSubTab == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        androidx.compose.animation.Crossfade(targetState = isDataReady && (selectedSubTab == 0 || selectedSubTab == 1)) { ready ->
+            if (ready) {
+                if (selectedSubTab == 0) {
+                    val displayList = remember(downloadedFiles, activeDownloads.size) {
+                        val list = downloadedFiles.toMutableList()
+                        activeDownloads.keys.forEach { name ->
+                            if (list.none { it.name == name }) {
+                                list.add(java.io.File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), name))
+                            }
+                        }
+                        list.sortedByDescending { it.lastModified() }
+                    }
+                    if (displayList.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apks_downloaded", languageSetting)) }
+                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(displayList) { file ->
+                        val fileName = file.name
+                        val parts = fileName.removeSuffix(".apk").split("_")
+                        val isDownloading = activeDownloads[fileName]?.isDownloading == true
+                        val isValid = if (isDownloading) true else isApkValid(context, file)
+                        val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
+                        val apkIcon = remember(file) { if (isValid && !isDownloading && file.exists()) getApkIcon(context, file) else null }
+                        Card(modifier = Modifier.fillMaxWidth().clickable { selectedFileForDialog = file }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
+                                if (apkIcon != null) {
+                                    AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                } else if (avatarUrl != null) {
+                                    AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                } else {
+                                    Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(parts.getOrNull(2) ?: file.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
+                                if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp) }
+                            }
+                            Text(if (isDownloading) activeDownloads[fileName]?.progress ?: "" else "${file.length() / (1024 * 1024)} MB", fontSize = 12.sp, color = Color.Gray)
+                        }; Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
+                        } }
+                    } }
+                } else {
+                    if (installedApps.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apps", languageSetting)) }
+                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(installedApps) { app ->
+                        Card(modifier = Modifier.fillMaxWidth().clickable { selectedAppForDialog = app }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { 
+                            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
+                                    if (app.icon != null) {
+                                        AsyncImage(model = app.icon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                    } else {
+                                        Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp)); 
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(app.label, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("${t("version", languageSetting)} ${app.version}", fontSize = 12.sp, color = Color.Gray)
+                                }
+                                
+                                // Small update indicator if available
+                                var hasUpdate by remember { mutableStateOf(false) }
+                                LaunchedEffect(app) {
+                                    val rels = if (app.platform == "GitHub") fetchGitHubReleases(app.owner, app.appName, githubToken)
+                                               else if (app.platform == "Codeberg") fetchCodebergReleases(app.owner, app.appName, codebergToken)
+                                               else emptyList()
+                                    val latest = rels.firstOrNull { !it.isPreRelease } ?: rels.firstOrNull()
+                                    if (latest != null && isNewerVersion(app.version, latest.version)) {
+                                        hasUpdate = true
+                                    }
+                                }
+                                
+                                if (hasUpdate) {
+                                    Surface(
+                                        onClick = { showAppUpdatePanel = app },
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
+                                        shape = CircleShape,
+                                        modifier = Modifier.padding(end = 12.dp)
+                                    ) {
+                                        Text(t("update_notice", languageSetting), modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
+                            } 
+                        }
+                    } }
+                }
+            } else {
+                Box(modifier = Modifier.fillMaxSize())
+            }
+        }
     }
 
     if (showUpdatePanel != null) {
@@ -1436,124 +1750,140 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
         val owner = parts.getOrNull(1) ?: ""
         val appName = parts.getOrNull(2) ?: ""
         val version = parts.getOrNull(3) ?: ""
+        
+        AppUpdatePanelDialog(platform, owner, appName, version, githubToken, codebergToken, languageSetting, context, fileName, file, activeDownloads, globalScope, onRefresh = { globalScope.launch { refreshFiles() } }, onDismiss = { showUpdatePanel = null }, onDownloadStarted = { selectedSubTab = 0 })
+    }
+    
+    if (showAppUpdatePanel != null) {
+        val app = showAppUpdatePanel!!
+        val fileName = "${app.platform}_${app.owner}_${app.appName}_latest.apk"
+        AppUpdatePanelDialog(app.platform, app.owner, app.appName, app.version, githubToken, codebergToken, languageSetting, context, fileName, null, activeDownloads, globalScope, onRefresh = { globalScope.launch { refreshInstalledApps() } }, onDismiss = { showAppUpdatePanel = null }, onDownloadStarted = { selectedSubTab = 0 })
+    }
+}
 
-        var latestRelease by remember { mutableStateOf<AppRelease?>(null) }
-        var isSearching by remember { mutableStateOf(true) }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppUpdatePanelDialog(
+    platform: String, owner: String, appName: String, version: String,
+    githubToken: String, codebergToken: String, languageSetting: String,
+    context: android.content.Context, fileName: String, fileToDelete: java.io.File?,
+    activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope,
+    onRefresh: () -> Unit, onDismiss: () -> Unit,
+    onDownloadStarted: () -> Unit = {}
+) {
+    var latestRelease by remember { mutableStateOf<AppRelease?>(null) }
+    var isSearching by remember { mutableStateOf(true) }
 
-        LaunchedEffect(Unit) {
-            val rels = if (platform == "GitHub") fetchGitHubReleases(owner, appName, githubToken)
-            else if (platform == "Codeberg") fetchCodebergReleases(owner, appName, codebergToken)
-            else emptyList()
-            
-            val currentRelease = rels.find { it.version == version }
-            val currentIsPre = currentRelease?.isPreRelease ?: false
-            
-            latestRelease = if (currentIsPre) {
-                // If current is pre-release, look for the newest release of any kind
-                rels.firstOrNull()
-            } else {
-                // If current is stable, look only for the newest stable release
-                rels.firstOrNull { !it.isPreRelease } ?: rels.firstOrNull()
-            }
-            isSearching = false
+    LaunchedEffect(Unit) {
+        val rels = if (platform == "GitHub") fetchGitHubReleases(owner, appName, githubToken)
+        else if (platform == "Codeberg") fetchCodebergReleases(owner, appName, codebergToken)
+        else emptyList()
+        
+        val currentRelease = rels.find { it.version == version }
+        val currentIsPre = currentRelease?.isPreRelease ?: false
+        
+        latestRelease = if (currentIsPre) {
+            rels.firstOrNull()
+        } else {
+            rels.firstOrNull { !it.isPreRelease } ?: rels.firstOrNull()
         }
+        isSearching = false
+    }
 
-        Dialog(onDismissRequest = { showUpdatePanel = null }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text(t("updates", languageSetting), fontWeight = FontWeight.Bold) },
-                        navigationIcon = { IconButton(onClick = { showUpdatePanel = null }) { Icon(Icons.Default.Close, null) } }
-                    )
-                }
-            ) { padding ->
-                Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (isSearching) {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.height(16.dp))
-                                Text(t("searching_updates", languageSetting), color = Color.Gray)
-                            }
-                        }
-                    } else if (latestRelease != null) {
-                        val lr = latestRelease!!
-                        val isNewer = isNewerVersion(version, lr.version)
-                        
-                        Column(modifier = Modifier.padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(if(isNewer) Icons.Default.NewReleases else Icons.Default.CheckCircle, null, modifier = Modifier.size(72.dp), tint = if(isNewer) MaterialTheme.colorScheme.primary else Color(0xFF4CAF50))
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(t("updates", languageSetting), fontWeight = FontWeight.Bold) },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) } }
+                )
+            }
+        ) { padding ->
+            Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (isSearching) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.height(16.dp))
-                            Text(if (isNewer) t("update_available_msg", languageSetting) else t("no_update_found", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                            Text(t("searching_updates", languageSetting), color = Color.Gray)
                         }
-                        
+                    }
+                } else if (latestRelease != null) {
+                    val lr = latestRelease!!
+                    val isNewer = isNewerVersion(version, lr.version)
+                    
+                    Column(modifier = Modifier.padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(if(isNewer) Icons.Default.NewReleases else Icons.Default.CheckCircle, null, modifier = Modifier.size(72.dp), tint = if(isNewer) MaterialTheme.colorScheme.primary else Color(0xFF4CAF50))
+                        Spacer(Modifier.height(16.dp))
+                        Text(if (isNewer) t("update_available_msg", languageSetting) else t("no_update_found", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                    }
+                    
+                    Spacer(Modifier.height(32.dp))
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
+                            Text(t("current_version", languageSetting), fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            Text(version, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        }
+                        Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(if(isNewer) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
+                            Text(t("new_version", languageSetting), fontSize = 11.sp, color = if(isNewer) MaterialTheme.colorScheme.primary else Color.Gray, fontWeight = FontWeight.Bold)
+                            Text(lr.version, fontSize = 18.sp, fontWeight = FontWeight.Black, color = if(isNewer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    if (lr.body.isNotBlank()) {
                         Spacer(Modifier.height(32.dp))
-                        
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
-                                Text(t("current_version", languageSetting), fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                                Text(version, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                            }
-                            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(if(isNewer) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
-                                Text(t("new_version", languageSetting), fontSize = 11.sp, color = if(isNewer) MaterialTheme.colorScheme.primary else Color.Gray, fontWeight = FontWeight.Bold)
-                                Text(lr.version, fontSize = 18.sp, fontWeight = FontWeight.Black, color = if(isNewer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                            }
-                        }
-
-                        if (lr.body.isNotBlank()) {
-                            Spacer(Modifier.height(32.dp))
-                            Text(t("changelog", languageSetting), fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-                            Spacer(Modifier.height(8.dp))
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(16.dp).verticalScroll(rememberScrollState())) {
-                                MarkdownBody(lr.body)
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-
-                        if (isNewer) {
-                            Spacer(Modifier.height(24.dp))
-                            Button(
-                                onClick = {
-                                    showUpdatePanel = null
-                                    selectedFileForDialog = null
-                                    activeDownloads[fileName] = DownloadInfo(isDownloading = true)
-                                    globalScope.launch {
-                                        val newFileName = "${platform}_${owner}_${appName}_${lr.version}.apk"
-                                        val newFile = downloadApk(context, newFileName, lr.downloadUrl, if(platform=="GitHub") githubToken else codebergToken, languageSetting) {
-                                            activeDownloads[fileName] = DownloadInfo(progress = it, isDownloading = true)
-                                        }
-                                        if (newFile != null) {
-                                            val wasSelected = selectedFileForDialog == file
-                                            file.delete()
-                                            withContext(Dispatchers.Main) {
-                                                if (wasSelected) selectedFileForDialog = newFile
-                                                refreshFiles()
-                                                activeDownloads.remove(fileName)
-                                            }
-                                        } else {
-                                            activeDownloads.remove(fileName)
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(64.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-                            ) {
-                                Icon(Icons.Default.Download, null)
-                                Spacer(Modifier.width(12.dp))
-                                Text(t("update_button", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            }
+                        Text(t("changelog", languageSetting), fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                        Spacer(Modifier.height(8.dp))
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(16.dp).verticalScroll(rememberScrollState())) {
+                            MarkdownBody(lr.body)
                         }
                     } else {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            Text(t("no_update_found", languageSetting), color = Color.Gray)
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    if (isNewer) {
+                        Spacer(Modifier.height(24.dp))
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                val newFileName = "${platform}_${owner}_${appName}_${lr.version}.apk"
+                                activeDownloads[newFileName] = DownloadInfo(isDownloading = true)
+                                onDownloadStarted()
+                                globalScope.launch {
+                                    val newFile = downloadApk(context, newFileName, lr.downloadUrl, if(platform=="GitHub") githubToken else codebergToken, languageSetting) {
+                                        activeDownloads[newFileName] = DownloadInfo(progress = it, isDownloading = true)
+                                    }
+                                    if (newFile != null) {
+                                        fileToDelete?.delete()
+                                        withContext(Dispatchers.Main) {
+                                            onRefresh()
+                                            activeDownloads.remove(newFileName)
+                                        }
+                                    } else {
+                                        activeDownloads.remove(newFileName)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(64.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Download, null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(t("update_button", languageSetting), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
+                    }
+                } else {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(t("no_update_found", languageSetting), color = Color.Gray)
                     }
                 }
             }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1834,6 +2164,11 @@ fun ProjectFilesScreen(
     }
 }
 
+private fun isImageFile(name: String): Boolean {
+    val ext = name.substringAfterLast(".", "").lowercase()
+    return listOf("png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "svg").contains(ext)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platform: String, onBack: () -> Unit, languageSetting: String, branch: String? = null) {
@@ -1853,7 +2188,9 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
     BackHandler { onBack() }
 
     LaunchedEffect(Unit) {
-        text = fetchFileContent(token, repo.owner, repo.name, file.path, platform, branch) ?: ""
+        if (!isImageFile(file.name)) {
+            text = fetchFileContent(token, repo.owner, repo.name, file.path, platform, branch) ?: ""
+        }
         isLoading = false
     }
 
@@ -1880,7 +2217,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
                 actions = {
                     if (isSaving) {
                         CircularProgressIndicator(Modifier.size(24.dp), color = accentColor, strokeWidth = 2.dp)
-                    } else {
+                    } else if (!isImageFile(file.name)) {
                         TextButton(onClick = {
                             isSaving = true
                             scope.launch {
@@ -1914,51 +2251,63 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
                     .padding(padding)
                     .background(editorBackground)
             ) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Line numbers column
-                    Column(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .background(gutterBackground)
-                            .verticalScroll(verticalScrollState)
-                            .padding(top = 12.dp, bottom = 100.dp, start = 8.dp, end = 8.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        lines.indices.forEach { i ->
-                            Text(
-                                text = (i + 1).toString(),
-                                fontSize = 12.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                color = gutterText,
-                                style = androidx.compose.ui.text.TextStyle(lineHeight = 20.sp),
-                                modifier = Modifier.height(20.dp)
+                if (isImageFile(file.name)) {
+                    val imageUrl = file.downloadUrl ?: ""
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        // Line numbers column
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .background(gutterBackground)
+                                .verticalScroll(verticalScrollState)
+                                .padding(top = 12.dp, bottom = 100.dp, start = 8.dp, end = 8.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            lines.indices.forEach { i ->
+                                Text(
+                                    text = (i + 1).toString(),
+                                    fontSize = 12.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = gutterText,
+                                    style = androidx.compose.ui.text.TextStyle(lineHeight = 20.sp),
+                                    modifier = Modifier.height(20.dp)
+                                )
+                            }
+                        }
+
+                        // Vertical separator
+                        Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(separatorLine))
+
+                        // Editor area
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(verticalScrollState)
+                                .horizontalScroll(horizontalScrollState)
+                                .padding(top = 12.dp, bottom = 100.dp, start = 8.dp, end = 100.dp)
+                        ) {
+                            BasicTextField(
+                                value = text,
+                                onValueChange = { text = it },
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    color = textColor,
+                                    lineHeight = 20.sp
+                                ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(accentColor),
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
-                    }
-
-                    // Vertical separator
-                    Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(separatorLine))
-
-                    // Editor area
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(verticalScrollState)
-                            .horizontalScroll(horizontalScrollState)
-                            .padding(top = 12.dp, bottom = 100.dp, start = 8.dp, end = 100.dp)
-                    ) {
-                        BasicTextField(
-                            value = text,
-                            onValueChange = { text = it },
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                fontSize = 13.sp,
-                                color = textColor,
-                                lineHeight = 20.sp
-                            ),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(accentColor),
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
@@ -2140,7 +2489,9 @@ fun SourceCodeViewerScreen(
     BackHandler { onBack() }
 
     LaunchedEffect(Unit) {
-        text = fetchFileContent(token, app.owner, app.name, file.path, app.platform, branch) ?: ""
+        if (!isImageFile(file.name)) {
+            text = fetchFileContent(token, app.owner, app.name, file.path, app.platform, branch) ?: ""
+        }
         isLoading = false
     }
 
@@ -2183,26 +2534,38 @@ fun SourceCodeViewerScreen(
                     .padding(padding)
                     .background(editorBackground)
             ) {
-                // Viewer area
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(verticalScrollState)
-                        .horizontalScroll(horizontalScrollState)
-                        .padding(top = 12.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
-                ) {
-                    BasicTextField(
-                        value = text,
-                        onValueChange = { },
-                        readOnly = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = 13.sp,
-                            color = textColor,
-                            lineHeight = 20.sp
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                if (isImageFile(file.name)) {
+                    val imageUrl = file.downloadUrl ?: ""
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                } else {
+                    // Viewer area
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(verticalScrollState)
+                            .horizontalScroll(horizontalScrollState)
+                            .padding(top = 12.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
+                    ) {
+                        BasicTextField(
+                            value = text,
+                            onValueChange = { },
+                            readOnly = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 13.sp,
+                                color = textColor,
+                                lineHeight = 20.sp
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -2210,6 +2573,26 @@ fun SourceCodeViewerScreen(
 }
 
 val httpClient = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).build()
+
+private suspend fun checkRepoStarred(token: String, owner: String, repo: String, platform: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val url = if (platform == "GitHub") "https://api.github.com/user/starred/$owner/$repo" else "https://codeberg.org/api/v1/user/starred/$owner/$repo"
+        val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
+        httpClient.newCall(Request.Builder().url(url).addHeader("Authorization", authHeader).addHeader("User-Agent", "OpiStore").build()).execute().use { resp ->
+            resp.code == 204
+        }
+    } catch (e: Exception) { false }
+}
+
+private suspend fun toggleRepoStar(token: String, owner: String, repo: String, platform: String, isCurrentlyStarred: Boolean): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val url = if (platform == "GitHub") "https://api.github.com/user/starred/$owner/$repo" else "https://codeberg.org/api/v1/user/starred/$owner/$repo"
+        val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
+        val req = Request.Builder().url(url).addHeader("Authorization", authHeader).addHeader("User-Agent", "OpiStore")
+        if (isCurrentlyStarred) req.delete() else req.put("".toRequestBody())
+        httpClient.newCall(req.build()).execute().use { it.isSuccessful }
+    } catch (e: Exception) { false }
+}
 
 private suspend fun fetchGitHubProfile(token: String, username: String? = null): UserProfile? = withContext(Dispatchers.IO) {
     try {
@@ -2539,15 +2922,36 @@ private suspend fun downloadApk(context: Context, fileName: String, url: String,
 }
 
 private fun installApk(context: Context, file: File) {
+    val pm = context.packageManager
     val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-    if (prefs.getBoolean("AUTO_DELETE_APK", false)) {
-        val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-        if (info != null) {
+    val info = pm.getPackageArchiveInfo(file.absolutePath, 0)
+    
+    if (info != null) {
+        val packageName = info.packageName
+        
+        // 1. Permanent tracking for "Apps" tab
+        val fileName = file.name
+        val fnParts = fileName.removeSuffix(".apk").split("_")
+        if (fnParts.size >= 3) {
+            val platform = fnParts[0]
+            val owner = fnParts[1]
+            val appName = fnParts[2]
+            val metaMapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet())?.toMutableSet() ?: mutableSetOf()
+            // Format: pkg|platform|owner|appName
+            // Remove old entry for same package if exists
+            metaMapping.removeAll { it.startsWith("$packageName|") }
+            metaMapping.add("$packageName|$platform|$owner|$appName")
+            prefs.edit().putStringSet("INSTALLED_APPS_META", metaMapping).apply()
+        }
+
+        // 2. Auto-delete mapping (if enabled)
+        if (prefs.getBoolean("AUTO_DELETE_APK", false)) {
             val mapping = prefs.getStringSet("APK_DELETE_MAPPING", emptySet())?.toMutableSet() ?: mutableSetOf()
-            mapping.add("${info.packageName}|${file.absolutePath}")
+            mapping.add("$packageName|${file.absolutePath}")
             prefs.edit().putStringSet("APK_DELETE_MAPPING", mapping).apply()
         }
     }
+    
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
     context.startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/vnd.android.package-archive"); flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK })
 }
@@ -4289,7 +4693,6 @@ fun UpdateScreen(
                                     val file = downloadApk(context, "update.apk", downloadUrl, "", languageSetting) { downloadProgress = it }
                                     if (file != null) {
                                         downloadedFile = file
-                                        installApk(context, file)
                                     }
                                     isDownloading = false
                                 }

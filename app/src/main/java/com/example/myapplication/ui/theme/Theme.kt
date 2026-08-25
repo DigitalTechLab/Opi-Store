@@ -38,9 +38,31 @@ fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    accentColor: String = "Standard",
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
+        accentColor != "Standard" -> {
+            val primary = when(accentColor) {
+                "Blue" -> BlueAccent
+                "Green" -> GreenAccent
+                "Red" -> RedAccent
+                else -> if (darkTheme) Purple80 else Purple40
+            }
+            if (darkTheme) {
+                darkColorScheme(
+                    primary = primary,
+                    secondary = PurpleGrey80,
+                    tertiary = Pink80
+                )
+            } else {
+                lightColorScheme(
+                    primary = primary,
+                    secondary = PurpleGrey40,
+                    tertiary = Pink40
+                )
+            }
+        }
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

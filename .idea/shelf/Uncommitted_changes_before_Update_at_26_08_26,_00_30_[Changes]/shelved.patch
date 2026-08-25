@@ -1,0 +1,39 @@
+Index: .idea/planningMode.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/planningMode.xml b/.idea/planningMode.xml
+new file mode 100644
+--- /dev/null	(date 1787692364507)
++++ b/.idea/planningMode.xml	(date 1787692364507)
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="PlanningModeManager">
++    <option name="approvalStates">
++      <map>
++        <entry key="0ab0bce9-9cb7-4dfb-8540-af77ea35ca85" value="false" />
++        <entry key="26936106-356e-4bdd-b670-a3437ca09835" value="false" />
++      </map>
++    </option>
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/appInsightsSettings.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/appInsightsSettings.xml b/.idea/appInsightsSettings.xml
+new file mode 100644
+--- /dev/null	(date 1787676737836)
++++ b/.idea/appInsightsSettings.xml	(date 1787676737836)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="AppInsightsSettings">
++    <option name="selectedTabId" value="Android vitals" />
++  </component>
++</project>
+\ No newline at end of file
