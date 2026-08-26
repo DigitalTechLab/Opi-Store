@@ -98,18 +98,30 @@ window.changeAppScreen = function(newSrc) {
 
   if (starsTimeout) clearTimeout(starsTimeout);
 
-  // Just change the source. The visibility logic is now in the 'load' event listener below.
-  appImage.src = newSrc;
+  // Set the current image as a background to the container for a true cross-fade effect
+  const screenClip = document.querySelector('.screen-clip');
+  screenClip.style.backgroundImage = `url('${appImage.src}')`;
 
-  if (!newSrc.includes('Photo1')) {
-    if (startHint) startHint.style.opacity = '0';
-  } else {
-    if (startHint) startHint.style.opacity = '1';
-  }
+  // Start fade out animation of the foreground image
+  appImage.style.opacity = '0';
+
+  // Small delay before changing the source to allow the background to be visible
+  setTimeout(() => {
+    appImage.src = newSrc;
+
+    if (!newSrc.includes('Photo1')) {
+      if (startHint) startHint.style.opacity = '0';
+    } else {
+      if (startHint) startHint.style.opacity = '1';
+    }
+  }, 50);
 };
 
-// Sync overlay visibility with the actual image swap to prevent flickering
+// Sync overlay visibility and fade back in when the new image is ready
 appImage.addEventListener('load', () => {
+    // Fade the image back in over the background (cross-fade)
+    appImage.style.opacity = '1';
+
     if (appImage.src.includes('Photo2')) {
         starsOverlay.classList.add('active');
         // Small delay for smooth opacity transition

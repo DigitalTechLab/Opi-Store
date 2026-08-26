@@ -285,6 +285,9 @@ body.fullscreen-active .simulator-header {
   border-radius: 34px;
   position: relative;
   line-height: 0;
+  background-size: 100% auto;
+  background-repeat: no-repeat;
+  background-color: #000;
 }
 
 .stars-overlay {
@@ -334,6 +337,9 @@ body.fullscreen-active .simulator-header {
   user-select: none;
   -webkit-user-drag: none;
   cursor: pointer;
+  transition: opacity 0.3s ease-in-out;
+  position: relative;
+  z-index: 2;
 }
 
 .start-hint {
