@@ -294,6 +294,8 @@ body.fullscreen-active .simulator-header {
   height: 2.54%; /* (56 / 2205) */
   background-color: #49454f;
   display: none; /* Only show on Photo2 */
+  opacity: 0;
+  transition: opacity 0.15s ease;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;

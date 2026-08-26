@@ -22,6 +22,8 @@ const fullscreenOverlay = document.getElementById('fullscreen-overlay');
 const iconExpand = document.getElementById('icon-expand');
 const iconCompress = document.getElementById('icon-compress');
 
+let starsTimeout;
+
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -92,23 +94,12 @@ closeDownloadPageBtn.addEventListener('click', () => {
 
 window.changeAppScreen = function(newSrc) {
   // Check if we are already on the target screen to prevent unnecessary resets
-  const currentPath = appImage.getAttribute('src');
-  if (currentPath === newSrc) return;
+  if (appImage.getAttribute('src') === newSrc) return;
 
-  // Always hide overlay immediately when switching to avoid flickering
-  starsOverlay.classList.remove('active');
+  if (starsTimeout) clearTimeout(starsTimeout);
 
+  // Just change the source. The visibility logic is now in the 'load' event listener below.
   appImage.src = newSrc;
-
-  // Show overlay only for Photo2
-  if (newSrc.includes('Photo2')) {
-    // Small delay to ensure image source has started swapping
-    setTimeout(() => {
-        if (appImage.src.includes('Photo2')) {
-            starsOverlay.classList.add('active');
-        }
-    }, 10);
-  }
 
   if (!newSrc.includes('Photo1')) {
     if (startHint) startHint.style.opacity = '0';
@@ -116,6 +107,19 @@ window.changeAppScreen = function(newSrc) {
     if (startHint) startHint.style.opacity = '1';
   }
 };
+
+// Sync overlay visibility with the actual image swap to prevent flickering
+appImage.addEventListener('load', () => {
+    if (appImage.src.includes('Photo2')) {
+        starsOverlay.classList.add('active');
+        // Small delay for smooth opacity transition
+        setTimeout(() => { starsOverlay.style.opacity = '1'; }, 10);
+    } else {
+        starsOverlay.classList.remove('active');
+        starsOverlay.style.opacity = '0';
+    }
+});
+
 
 appImage.addEventListener('click', (e) => {
   const rect = appImage.getBoundingClientRect();
