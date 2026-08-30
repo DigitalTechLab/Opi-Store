@@ -425,6 +425,10 @@ body.fullscreen-active .simulator-header {
   width: 100%;
 }
 
+.simulator-section .scroll-indicator {
+  margin-top: 60px;
+}
+
 body.fullscreen-active .about-section {
   opacity: 0;
   visibility: hidden;
