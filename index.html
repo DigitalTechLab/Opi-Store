@@ -9,9 +9,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
 </head>
 <body>
 <div class="background-glow"></div>
+
+<div class="logo-3d-container">
+    <model-viewer
+        id="corner-logo"
+        src="3D-Models/Open-Source-Logo.glb"
+        alt="3D Open Source Logo"
+        auto-rotate
+        rotation-speed="1"
+        camera-controls
+        disable-zoom
+        disable-pan
+        shadow-intensity="1"
+        interaction-prompt="none"
+        camera-orbit="0deg 75deg 2m">
+    </model-viewer>
+</div>
 
 <header class="hero-section">
     <div class="hero-content">

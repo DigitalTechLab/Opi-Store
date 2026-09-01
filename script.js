@@ -24,6 +24,26 @@ const iconCompress = document.getElementById('icon-compress');
 
 let starsTimeout;
 
+const rotatingLogo = document.getElementById('corner-logo');
+
+if (rotatingLogo) {
+  // Speed up rotation on hover (PC) or touch (Mobile)
+  const handleStart = () => {
+    rotatingLogo.setAttribute('rotation-speed', '20');
+  };
+
+  const handleEnd = () => {
+    rotatingLogo.setAttribute('rotation-speed', '1');
+  };
+
+  rotatingLogo.addEventListener('mouseenter', handleStart);
+  rotatingLogo.addEventListener('mouseleave', handleEnd);
+
+  // Touch events for mobile
+  rotatingLogo.addEventListener('touchstart', handleStart);
+  rotatingLogo.addEventListener('touchend', handleEnd);
+}
+
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
