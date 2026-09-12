@@ -350,11 +350,11 @@ body.fullscreen-active .simulator-header {
 
 .stars-overlay {
   position: absolute;
-  top: 63.13%; /* (1392 / 2205) */
-  right: 6.2%;  /* (1080 - 1013) / 1080 */
-  height: 2.54%; /* (56 / 2205) */
+  top: 63.13%;
+  right: 6.2%;
+  height: 2.54%;
   background-color: #49454f;
-  display: none; /* Only show on Photo2 */
+  display: none;
   opacity: 0;
   transition: opacity 0.15s ease;
   align-items: center;
@@ -372,7 +372,7 @@ body.fullscreen-active .simulator-header {
 .star-icon {
   width: 12px;
   height: 12px;
-  color: #ffca28; /* Golden Yellow */
+  color: #ffca28;
 }
 
 .stars-overlay.active {
@@ -820,7 +820,7 @@ body.fullscreen-active .about-section {
   }
 
   .download-page-content {
-    animation: none; /* Faster appearance */
+    animation: none;
   }
 
   .back-btn {

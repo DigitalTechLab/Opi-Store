@@ -1,7 +1,7 @@
 const REPO_OWNER = 'DigitalTechLab';
 const REPO_NAME = 'Opi-Store';
 const SUGGESTIONS_REPO = 'Opi-Store-Suggestions';
-const GITHUB_TOKEN = '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';
+const token = CONFIG.GITHUB_TOKEN;
 const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases`;
 const REPO_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
 const SUGGESTIONS_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${SUGGESTIONS_REPO}`;
@@ -80,12 +80,12 @@ async function fetchRepoStats() {
 
 function githubHeaders() {
   const headers = { Accept: 'application/vnd.github+json' };
-  if (GITHUB_TOKEN.trim()) headers.Authorization = `Bearer ${GITHUB_TOKEN.trim()}`;
+  if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
   return headers;
 }
 
 async function githubRequest(path, options = {}) {
-  if (!GITHUB_TOKEN.trim() && options.method && options.method !== 'GET') {
+  if (!token.trim() && options.method && options.method !== 'GET') {
     throw new Error('Posts are currently unavailable.');
   }
   const response = await fetch(`${SUGGESTIONS_API_URL}${path}`, {
@@ -131,7 +131,7 @@ function decodeBase64(value) {
 
 async function loadPosts() {
   allPosts.innerHTML = '<p class="posts-status">Loading posts…</p>';
-  if (!GITHUB_TOKEN.trim()) {
+  if (!token.trim()) {
     allPosts.innerHTML = '<p class="posts-status">Posts are currently unavailable.</p>';
     return [];
   }
