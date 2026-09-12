@@ -339,7 +339,12 @@ function parseChat(chat) {
 function openPost(folder) {
   const post = postsCache.find((item) => item.folder === folder);
   if (!post) return;
-  const messages = parseChat(post.chat);
+  const messages = parseChat(post.chat).filter((message, index) => {
+    const isDuplicateSubmission = index === 0 &&
+      message.user === post.user &&
+      message.message.trim() === post.submission.trim();
+    return !isDuplicateSubmission;
+  });
   const displayType = post.type === 'Bug-Report' ? 'Bug Report' :
     post.type === 'Feature-Request' ? 'Feature Request' : 'Discussion';
   const shareUrl = buildPostShareUrl(post.folder);
@@ -450,7 +455,7 @@ async function submitPost(event) {
   status.innerText = 'Publishing…';
   try {
     const submission = btoa(unescape(encodeURIComponent(text)));
-    const chat = btoa(unescape(encodeURIComponent(`[${currentUser}]=${text}\n`)));
+    const chat = btoa(unescape(encodeURIComponent('')));
     await githubRequest(`/contents/${encodePath(`${folder}/Submission-Text.txt`)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
