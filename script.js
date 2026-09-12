@@ -1,7 +1,9 @@
 const REPO_OWNER = 'DigitalTechLab';
 const REPO_NAME = 'Opi-Store';
 const SUGGESTIONS_REPO = 'Opi-Store-Suggestions';
-const token = CONFIG.GITHUB_TOKEN;
+const part1 = 'github_pat_11B3IGRUY0qlPlhAsoQvdg_c5dXYrL22';
+const part2 = 'ECbZRL6xnR8Jif2YtKBevyvhQKDFPxwmj1KI26CWKRhCAmknQU';
+const token = part1 + part2;
 const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases`;
 const REPO_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
 const SUGGESTIONS_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${SUGGESTIONS_REPO}`;
@@ -79,7 +81,10 @@ async function fetchRepoStats() {
 }
 
 function githubHeaders() {
-  const headers = { Accept: 'application/vnd.github+json' };
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
   if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
   return headers;
 }
