@@ -14,7 +14,14 @@
 <body>
 <div class="background-glow"></div>
 
-<header class="hero-section">
+<nav class="site-nav" aria-label="Main navigation">
+    <div class="site-nav-links">
+        <a class="site-nav-link active" href="#home">Home</a>
+        <a class="site-nav-link" href="#posts-page">Posts</a>
+    </div>
+</nav>
+
+<header id="home" class="hero-section">
     <div class="hero-content">
         <div class="app-icon-wrapper">
             <img src="Photos/Logo.png" alt="Opi-Store Logo" class="app-icon" onerror="this.onerror=null; this.src='Logo.png';">
@@ -109,7 +116,58 @@
             This is an open source app store where you can browse apps on Github, Gitlab and Codeberg, filtered to only show apk files. Because of the limits for sending requests to the Github and Codeberg server, you can login with your account token. You can create and edit your repositorys too. There's an extra code editor for your repos to change things quickly!
         </p>
     </div>
+
 </footer>
+
+<div id="posts-page" class="posts-page" aria-hidden="true">
+    <div class="posts-page-content">
+        <div class="posts-page-heading">
+            <div class="posts-heading-copy">
+                <div class="posts-title-row">
+                    <h2 class="page-title">Community Posts</h2>
+                    <button id="open-create-post-btn-page" class="btn create-post-action" type="button" aria-label="Create a post" title="Create a post">+</button>
+                </div>
+                <p class="page-subtitle">Ideas, bug reports and discussions from the Opi-Store community.</p>
+            </div>
+        </div>
+        <div id="all-posts" class="posts-list" aria-live="polite"></div>
+    </div>
+</div>
+
+<div id="post-detail-page" class="posts-page post-detail-page" aria-hidden="true">
+    <div class="posts-page-content">
+        <button id="close-post-detail" class="back-btn" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Posts
+        </button>
+        <article id="post-detail" class="post-detail"></article>
+    </div>
+</div>
+
+<div id="create-post-page" class="posts-page" aria-hidden="true">
+    <div class="posts-page-content create-post-content">
+        <button id="close-create-post" class="back-btn" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back
+        </button>
+        <h2 class="page-title">Create a post</h2>
+        <p class="page-subtitle">Your browser identity is <strong id="current-user-name">User</strong>.</p>
+        <form id="create-post-form" class="post-form">
+            <label for="post-type">Type</label>
+            <select id="post-type" required>
+                <option value="Feature-Request">Feature Request</option>
+                <option value="Bug-Report">Bug Report</option>
+                <option value="Discussion">Discussion</option>
+            </select>
+            <label for="post-title">Title</label>
+            <input id="post-title" maxlength="80" required placeholder="Short description">
+            <label for="post-text">Details</label>
+            <textarea id="post-text" maxlength="4000" required placeholder="Describe your idea or problem…"></textarea>
+            <button class="btn" type="submit">Publish post</button>
+            <p id="create-post-status" class="form-status" role="status"></p>
+        </form>
+    </div>
+</div>
 
 <div id="download-page" class="download-page">
     <div class="download-page-content">
