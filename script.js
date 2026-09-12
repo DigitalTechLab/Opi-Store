@@ -35,11 +35,14 @@ const postDetail = $('post-detail');
 const createPostForm = $('create-post-form');
 const createPostStatus = $('create-post-status');
 const currentUserName = $('current-user-name');
+const postShareLoading = $('post-share-loading');
+const postShareLoadingText = $('post-share-loading-text');
 
 let starsTimeout;
 let isFullscreen = false;
 let postsCache = [];
 let currentUser = localStorage.getItem(USER_STORAGE_KEY);
+let postShareErrorTimeout;
 
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -182,6 +185,102 @@ function assignUser(posts) {
   currentUserName.innerText = currentUser;
 }
 
+function buildPostShareUrl(folder) {
+  const baseUrl = window.location.href.split('#')[0];
+  return `${baseUrl}#post=${encodeURIComponent(folder)}`;
+}
+
+function copyShareLink(folder, button = null) {
+  const shareUrl = buildPostShareUrl(folder);
+  const finishCopy = () => {
+    if (button) {
+      const originalTitle = button.title;
+      const originalLabel = button.getAttribute('aria-label');
+      button.title = 'Link copied';
+      button.setAttribute('aria-label', 'Link copied');
+      button.classList.add('copied');
+      setTimeout(() => {
+        button.title = originalTitle;
+        button.setAttribute('aria-label', originalLabel);
+        button.classList.remove('copied');
+      }, 1400);
+    }
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(shareUrl)
+      .then(finishCopy)
+      .catch(() => {
+        window.prompt('Copy this link to share it:', shareUrl);
+      });
+    return;
+  }
+
+  window.prompt('Copy this link to share it:', shareUrl);
+}
+
+function showPostShareLoading() {
+  clearTimeout(postShareErrorTimeout);
+  postShareLoadingText.textContent = 'Searching post';
+  postShareLoading.classList.remove('error');
+  postShareLoading.querySelector('.post-share-loading-icon').outerHTML = `
+    <svg class="post-share-loading-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle>
+      <path d="m20 20-4-4"></path>
+    </svg>
+  `;
+  postShareLoading.querySelector('.post-share-spinner').classList.remove('hidden');
+  postShareLoading.classList.add('active');
+  postShareLoading.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function hidePostShareLoading() {
+  postShareLoading.classList.remove('active');
+  postShareLoading.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function showPostShareError() {
+  postShareLoading.classList.add('error');
+  postShareLoadingText.textContent = "Post didn't found";
+  postShareLoading.querySelector('.post-share-loading-icon').outerHTML = `
+    <svg class="post-share-loading-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 8v5"></path>
+      <path d="M12 16h.01"></path>
+    </svg>
+  `;
+  postShareLoading.querySelector('.post-share-spinner').classList.add('hidden');
+  postShareErrorTimeout = setTimeout(() => {
+    hidePostShareLoading();
+    history.replaceState(null, '', window.location.href.split('#')[0]);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, 3000);
+}
+
+function openPostFromHash() {
+  const hash = window.location.hash;
+  if (!hash.startsWith('#post=')) return;
+  try {
+    const folder = decodeURIComponent(hash.slice(6));
+    if (!folder) {
+      showPostShareError();
+      return;
+    }
+    const post = postsCache.find((item) => item.folder === folder);
+    if (post) {
+      hidePostShareLoading();
+      openPost(folder);
+    } else {
+      showPostShareError();
+    }
+  } catch (error) {
+    console.error('Unable to open post from hash.', error);
+    showPostShareError();
+  }
+}
+
 function renderPosts() {
   const displayType = (type) => type === 'Bug-Report' ? 'Bug Report' :
     type === 'Feature-Request' ? 'Feature Request' : 'Discussion';
@@ -193,12 +292,27 @@ function renderPosts() {
       </div>
       <h3>${escapeHtml(post.title)}</h3>
       <p>${escapeHtml(post.submission).slice(0, 180)}${post.submission.length > 180 ? '…' : ''}</p>
+      <div class="post-card-footer">
+        <button class="share-card-btn" type="button" data-share-post="${encodeURIComponent(post.folder)}" aria-label="Share post" title="Share post">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+      </div>
     </article>
   `;
   const cards = postsCache.map(card).join('');
   allPosts.innerHTML = cards;
   document.querySelectorAll('.post-card').forEach((card) => {
     card.addEventListener('click', () => openPost(decodeURIComponent(card.dataset.post)));
+  });
+  document.querySelectorAll('.share-card-btn').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const post = postsCache.find((item) => item.folder === decodeURIComponent(button.dataset.sharePost));
+      if (post) copyShareLink(post.folder, button);
+    });
   });
   document.querySelectorAll('.delete-card-btn').forEach((button) => {
     button.addEventListener('click', (event) => {
@@ -228,6 +342,7 @@ function openPost(folder) {
   const messages = parseChat(post.chat);
   const displayType = post.type === 'Bug-Report' ? 'Bug Report' :
     post.type === 'Feature-Request' ? 'Feature Request' : 'Discussion';
+  const shareUrl = buildPostShareUrl(post.folder);
   postDetail.innerHTML = `
     <span class="post-meta">${displayType} · ${post.user}</span>
     <h1>${escapeHtml(post.title)}</h1>
@@ -241,6 +356,7 @@ function openPost(folder) {
     </form>
     <p class="form-status reply-status" role="status"></p>
   `;
+  history.replaceState(null, '', shareUrl);
   postDetailPage.classList.add('active');
   postDetailPage.setAttribute('aria-hidden', 'false');
   document.body.classList.add('post-detail-active');
@@ -309,7 +425,13 @@ function closePage(page) {
   if (page === postsPage) {
     document.body.classList.remove('posts-active');
   }
-  if (page === postDetailPage) document.body.classList.remove('post-detail-active');
+  if (page === postDetailPage) {
+    document.body.classList.remove('post-detail-active');
+    const currentHash = window.location.hash;
+    if (currentHash.startsWith('#post=')) {
+      history.replaceState(null, '', window.location.href.split('#')[0]);
+    }
+  }
   if (page === createPostPage) document.body.classList.remove('create-post-active');
   const hasPostsOverlay = [postsPage, postDetailPage, createPostPage]
     .some((item) => item.classList.contains('active'));
@@ -456,7 +578,17 @@ document.querySelectorAll('.site-nav-link').forEach((link) => {
 
 });
 
+window.addEventListener('hashchange', () => {
+  if (window.location.hash.startsWith('#post=')) {
+    showPostShareLoading();
+    openPostFromHash();
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   fetchRepoStats();
-  loadPosts();
+  if (window.location.hash.startsWith('#post=')) showPostShareLoading();
+  loadPosts().then(() => {
+    openPostFromHash();
+  });
 });

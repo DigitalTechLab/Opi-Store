@@ -512,14 +512,41 @@ body.fullscreen-active .simulator-header {
   padding: 20px;
   cursor: pointer;
   transition: transform .2s ease, border-color .2s ease;
+  position: relative;
 }
 
 .post-card:hover { transform: translateY(-3px); border-color: rgba(99, 102, 241, .6); box-shadow: 0 12px 28px rgba(0, 0, 0, .25); }
 .post-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .post-card h3 { color: #fff; margin: 10px 0 8px; font-size: 1.05rem; }
 .post-card p { color: var(--text-muted); line-height: 1.55; font-size: .92rem; }
+.post-card-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
 .post-meta { color: var(--accent-color); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .posts-status { color: var(--text-muted); grid-column: 1 / -1; }
+.share-card-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(165, 180, 252, 0.36);
+  background: rgba(99, 102, 241, 0.12);
+  color: #dfe7ff;
+  border-radius: 50%;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+}
+.share-card-btn:hover {
+  background: rgba(99, 102, 241, 0.24);
+  transform: translateY(-1px);
+}
+.share-card-btn.copied {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(74, 222, 128, 0.45);
+  color: #dcfce7;
+}
 
 
 .posts-page {
@@ -600,6 +627,29 @@ body.fullscreen-active .simulator-header {
 .post-detail { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 22px; padding: 28px; }
 .post-detail h1 { color: #fff; font-size: clamp(1.7rem, 5vw, 2.5rem); margin: 10px 0 14px; }
 .post-detail .submission { white-space: pre-wrap; color: var(--text-main); line-height: 1.7; padding-bottom: 28px; border-bottom: 1px solid var(--card-border); }
+.post-share-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 14px;
+}
+.post-share-label {
+  color: #c7d2fe;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.post-share-link {
+  color: #f8fafc;
+  word-break: break-all;
+  line-height: 1.5;
+  text-decoration: underline;
+}
 .chat { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; }
 .chat-message { background: rgba(99, 102, 241, .12); border-radius: 14px; padding: 12px 15px; }
 .chat-message strong { color: #a5b4fc; font-size: .85rem; }
@@ -704,6 +754,79 @@ body.fullscreen-active .about-section {
 .fullscreen-overlay.active {
   opacity: 1;
   pointer-events: all;
+}
+
+.post-share-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 28px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, .1), transparent 38%),
+    var(--bg-color);
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+
+.post-share-loading.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.post-share-loading-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #e5e7eb;
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.post-share-loading-icon {
+  color: #a5b4fc;
+}
+
+.post-share-loading-dots {
+  width: 18px;
+  overflow: hidden;
+  animation: post-share-dots 1.2s steps(4, end) infinite;
+}
+
+.post-share-spinner {
+  width: 38px;
+  height: 38px;
+  margin-top: 28px;
+  border: 3px solid rgba(165, 180, 252, .2);
+  border-top-color: #818cf8;
+  border-radius: 50%;
+  animation: post-share-spin .8s linear infinite;
+}
+
+.post-share-spinner.hidden {
+  display: none;
+}
+
+.post-share-loading.error .post-share-loading-icon {
+  color: #fca5a5;
+}
+
+.post-share-loading.error .post-share-loading-bar {
+  color: #fecaca;
+}
+
+@keyframes post-share-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes post-share-dots {
+  0% { width: 0; }
+  100% { width: 18px; }
 }
 
 .download-page {
