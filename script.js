@@ -160,7 +160,7 @@ async function loadPosts() {
         chatSha: chat.sha
       };
     }));
-    posts.sort((a, b) => b.folder.localeCompare(a.folder));
+    posts.sort((a, b) => a.folder.localeCompare(b.folder));
     postsCache = posts;
     assignUser(posts);
     renderPosts();
@@ -450,7 +450,7 @@ async function submitPost(event) {
   const title = $('post-title').value.trim();
   const text = $('post-text').value.trim();
   if (!title || !text) return;
-  const slug = title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'Untitled';
+  const slug = title.replace(/[^a-z0-9.]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'Untitled';
   const folder = `${type}-${slug}:${currentUser}`;
   status.innerText = 'Publishing…';
   try {
