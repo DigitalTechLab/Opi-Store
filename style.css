@@ -837,8 +837,8 @@ body.fullscreen-active .about-section {
 
 .aads-frame iframe {
   display: block;
-  width: min(100%, 520px);
-  height: 90px;
+  width: 70%;
+  height: auto;
   margin: 0 auto;
   border: 0;
   padding: 0;
@@ -870,14 +870,6 @@ body.fullscreen-active .about-section {
   background: #3b4150;
 }
 
-body.fullscreen-active .aads-banner,
-body.posts-active .aads-banner,
-body.post-detail-active .aads-banner,
-body.create-post-active .aads-banner,
-.download-page.active ~ .aads-banner {
-  display: none;
-}
-
 @media (max-width: 600px) {
   .aads-banner {
     bottom: max(8px, env(safe-area-inset-bottom));
@@ -885,9 +877,7 @@ body.create-post-active .aads-banner,
     padding: 6px 5px 3px;
   }
 
-  .aads-frame iframe {
-    height: 60px;
-  }
+  .aads-frame iframe { width: 70%; }
 }
 
 .post-share-loading.error .post-share-loading-icon {
