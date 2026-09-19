@@ -39,7 +39,7 @@ const postShareLoading = $('post-share-loading');
 const postShareLoadingText = $('post-share-loading-text');
 const aadsBanner = $('aads-banner');
 const closeAadsBanner = $('close-aads-banner');
-const aadsFrame = $('aads-frame');
+const aadsFrame = $('frame');
 
 let starsTimeout;
 let isFullscreen = false;

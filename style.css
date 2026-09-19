@@ -816,7 +816,7 @@ body.fullscreen-active .about-section {
   position: fixed;
   left: 50%;
   bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 900;
+  z-index: 99998;
   width: min(calc(100% - 24px), 728px);
   padding: 8px 8px 4px;
   transform: translateX(-50%);
@@ -837,9 +837,9 @@ body.fullscreen-active .about-section {
 
 .aads-frame iframe {
   display: block;
-  width: 100%;
+  width: min(100%, 520px);
   height: 90px;
-  max-width: 100%;
+  margin: 0 auto;
   border: 0;
   padding: 0;
   overflow: hidden;
