@@ -37,12 +37,16 @@ const createPostStatus = $('create-post-status');
 const currentUserName = $('current-user-name');
 const postShareLoading = $('post-share-loading');
 const postShareLoadingText = $('post-share-loading-text');
+const aadsBanner = $('aads-banner');
+const closeAadsBanner = $('close-aads-banner');
+const aadsFrame = $('aads-frame');
 
 let starsTimeout;
 let isFullscreen = false;
 let postsCache = [];
 let currentUser = localStorage.getItem(USER_STORAGE_KEY);
 let postShareErrorTimeout;
+let aadsRefreshInterval;
 
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -557,6 +561,21 @@ function toggleFullscreen() {
 fullscreenBtn.addEventListener('click', toggleFullscreen);
 fullscreenOverlay.addEventListener('click', () => { if (isFullscreen) toggleFullscreen(); });
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && isFullscreen) toggleFullscreen(); });
+
+function refreshAadsBanner() {
+  const iframe = aadsFrame.querySelector('iframe');
+  if (!iframe || aadsBanner.hidden) return;
+  const adUrl = new URL(iframe.src, window.location.href);
+  adUrl.searchParams.set('refresh', Date.now().toString());
+  iframe.src = adUrl.toString();
+}
+
+closeAadsBanner.addEventListener('click', () => {
+  aadsBanner.hidden = true;
+  clearInterval(aadsRefreshInterval);
+});
+
+aadsRefreshInterval = window.setInterval(refreshAadsBanner, 30000);
 
 $('open-create-post-btn-page').addEventListener('click', () => openPage(createPostPage));
 $('close-post-detail').addEventListener('click', () => closePage(postDetailPage));
