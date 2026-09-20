@@ -164,7 +164,7 @@ async function loadPosts() {
         chatSha: chat.sha
       };
     }));
-    posts.sort((a, b) => a.folder.localeCompare(b.folder));
+    posts.sort((a, b) => b.folder.localeCompare(a.folder));
     postsCache = posts;
     assignUser(posts);
     renderPosts();
