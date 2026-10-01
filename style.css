@@ -1007,33 +1007,42 @@ body.fullscreen-active .about-section {
 
 @media (max-width: 600px) {
   .download-page {
-    padding: 25px 15px;
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: max(25px, env(safe-area-inset-top)) 15px max(25px, env(safe-area-inset-bottom));
   }
 
   .download-page-content {
     animation: none;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
   }
 
   .back-btn {
     margin-bottom: 20px;
-    font-size: 0.95rem;
+    padding: 8px 0;
+    font-size: 1rem;
   }
 
   .page-title {
-    font-size: 1.7rem;
-    margin-bottom: 5px;
+    font-size: 2rem;
+    margin-bottom: 8px;
   }
 
   .page-subtitle {
-    font-size: 0.9rem;
-    margin-bottom: 15px;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
   }
 
   .steps-container {
+    flex: 1;
     gap: 12px;
   }
 
   .step-card {
+    flex: 1;
     padding: 16px;
     gap: 16px;
     border-radius: 18px;
@@ -1046,18 +1055,20 @@ body.fullscreen-active .about-section {
   }
 
   .step-details h3 {
-    font-size: 1.05rem;
-    margin-bottom: 4px;
+    font-size: 1.2rem;
+    margin-bottom: 8px;
   }
 
   .step-details p {
-    font-size: 0.9rem;
-    line-height: 1.5;
+    font-size: 1rem;
+    line-height: 1.6;
   }
 
   .small-btn {
-    margin-top: 12px;
-    padding: 10px 18px;
-    font-size: 0.9rem;
+    width: 100%;
+    min-height: 52px;
+    margin-top: 16px;
+    padding: 14px 18px;
+    font-size: 1rem;
   }
 }
