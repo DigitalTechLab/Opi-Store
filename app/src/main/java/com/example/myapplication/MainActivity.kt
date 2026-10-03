@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -86,6 +87,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import coil3.compose.AsyncImage
+import coil3.compose.rememberAsyncImagePainter
 import dev.jeziellago.compose.markdowntext.MarkdownText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +123,8 @@ data class RepoStats(val stars: Int, val forks: Int, val watchers: Int, val lang
 data class ReleaseAsset(val id: String, val name: String, val downloadUrl: String, val size: Long, val downloadCount: Int)
 data class FullRelease(val id: String, val tagName: String, val name: String, val body: String, val isPreRelease: Boolean, val assets: List<ReleaseAsset>, val htmlUrl: String)
 data class InstalledApp(val packageName: String, val label: String, val version: String, val icon: Drawable?, val platform: String, val owner: String, val appName: String)
+data class DeviceAppItem(val packageName: String, val label: String, val isSystemApp: Boolean)
+data class RepoApkGroup(val repoKey: String, val platform: String, val owner: String, val appName: String, val files: List<File>)
 
 
 private fun t(key: String, lang: String): String {
@@ -305,6 +309,8 @@ private fun t(key: String, lang: String): String {
         "open_browser_title" -> if (isDe) "Link öffnen?" else "Open Link?"
         "open_browser_message" -> if (isDe) "Dieser Link wird im Webbrowser geöffnet. Möchtest du fortfahren?" else "This link will open in your web browser. Do you want to proceed?"
         "proceed" -> if (isDe) "Fortfahren" else "Proceed"
+        "system_app" -> if (isDe) "System" else "System"
+        "user_app" -> if (isDe) "Benutzer" else "User"
         else -> key
     }
 }
@@ -573,8 +579,6 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
         ReleasesManagementScreen(repo = selectedRepoForReleases!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForReleases = null }, onReleaseClick = { selectedReleaseForEdit = it }, languageSetting = languageSetting)
     } else if (selectedRepoForPRs != null) {
         PullRequestsScreen(app = OpenSourceApp(id = "${selectedRepoForPRs!!.owner}/${selectedRepoForPRs!!.name}", name = selectedRepoForPRs!!.name, owner = selectedRepoForPRs!!.owner, platform = fullRepoListPlatform, description = selectedRepoForPRs!!.description, repoUrl = selectedRepoForPRs!!.htmlUrl, avatarUrl = ""), githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, onUserClick = { user, plat, avatar -> showFullRepoListForUser = user; fullRepoListPlatform = plat; fullRepoListAvatarUrl = avatar; fullRepoListAppsOnly = true; isViewingOwnProfile = false; selectedRepoForPRs = null }, onDismiss = { selectedRepoForPRs = null })
-    } else if (selectedRepoForFiles != null) {
-        ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null; selectedBranch = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting, selectedBranch = selectedBranch, onBranchChange = { selectedBranch = it })
     } else if (showFullRepoListForUser != null) {
         FullRepoListScreen(
             owner = showFullRepoListForUser!!,
@@ -612,10 +616,8 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
             onSourceCodeClick = { app, branch -> selectedSourceBranch = branch; selectedAppForSourceCode = app }
         )
     } else {
-        BackHandler {
-            if (selectedTab != 0) {
-                selectedTab = 0
-            }
+        BackHandler(enabled = selectedTab != 0) {
+            selectedTab = 0
         }
         Scaffold(
             bottomBar = {
@@ -1044,7 +1046,7 @@ fun AccountScreenDetails(token: String, platformName: String, onTokenSaved: (Str
         AlertDialog(onDismissRequest = { showEditProfileDialog = false }, title = { Text("$platformName ${t("profile_edit_title", languageSetting)}") }, text = { Column { OutlinedTextField(value = editNameInput, onValueChange = { editNameInput = it }, label = { Text(t("display_name", languageSetting)) }); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(value = editBioInput, onValueChange = { editBioInput = it }, label = { Text(t("bio", languageSetting)) }, maxLines = 3) } }, confirmButton = { Button(onClick = { scope.launch { val success = updateProfile(token, editNameInput, editBioInput); if (success) userProfile = userProfile?.copy(name = editNameInput, bio = editBioInput); showEditProfileDialog = false } }) { Text(t("save", languageSetting)) } }, dismissButton = { TextButton(onClick = { showEditProfileDialog = false }) { Text(t("cancel", languageSetting)) } })
     }
 
-    if (isCheckingToken) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+    if (isCheckingToken) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant) } }
     else if (userProfile != null && !isEditingToken) {
         LazyColumn(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             item {
@@ -1162,7 +1164,7 @@ fun SearchScreen(githubToken: String, codebergToken: String, onAppSelected: (Ope
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(t("search_title", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(value = query, onValueChange = { onQueryChange(it) }, label = { Text(t("search_hint", languageSetting)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, trailingIcon = { IconButton(onClick = { if (query.isNotBlank()) onPerformSearch(query) }) { Icon(Icons.Default.Search, null) } }); Spacer(modifier = Modifier.height(16.dp))
-        if (isLoading) Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        if (isLoading) Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant) }
         else if (statusMessage.isNotEmpty()) Text(statusMessage, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) { items(searchResults) { app -> AppCard(app = app, onClick = { onAppSelected(app) }) } }
     }
@@ -1258,39 +1260,42 @@ fun AppDetailFullScreen(
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val scrollState = rememberScrollState()
-    var releases by remember { mutableStateOf<List<AppRelease>?>(null) }; var isLoadingReleases by remember { mutableStateOf(true) }
-    var selectedRelease by remember { mutableStateOf<AppRelease?>(null) }; var showVersionSheet by remember { mutableStateOf(false) }
+    var releases by remember { mutableStateOf<List<AppRelease>?>(null) }
+    var selectedRelease by remember { mutableStateOf<AppRelease?>(null) }
+    var showVersionSheet by remember { mutableStateOf(false) }
     var showAssetSheet by remember { mutableStateOf(false) }
 
     var showIssues by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
     var showImageZoom by remember { mutableStateOf(false) }
-    var isPrefetchingSource by remember { mutableStateOf(false) }
 
     var isStarred by remember { mutableStateOf(false) }
-    var isCheckingStar by remember { mutableStateOf(false) }
+    var isTogglingStar by remember { mutableStateOf(false) }
+    var isInitialLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(app) {
+        isInitialLoading = true
         val token = if (app.platform == "GitHub") githubToken else codebergToken
-        if (token.isNotBlank()) {
-            isCheckingStar = true
-            isStarred = checkRepoStarred(token, app.owner, app.name, app.platform)
-            isCheckingStar = false
+        coroutineScope {
+            val starJob = launch {
+                if (token.isNotBlank()) {
+                    isStarred = checkRepoStarred(token, app.owner, app.name, app.platform)
+                }
+            }
+            val releasesJob = launch {
+                if (app.preFetchedReleases != null) {
+                    releases = app.preFetchedReleases
+                    selectedRelease = app.preFetchedReleases.firstOrNull()
+                } else {
+                    val fetched = fetchReleasesForApp(app, githubToken, codebergToken)
+                    releases = fetched
+                    selectedRelease = fetched.firstOrNull()
+                }
+            }
+            starJob.join()
+            releasesJob.join()
         }
-    }
-
-    LaunchedEffect(app) {
-        if (app.preFetchedReleases != null) {
-            releases = app.preFetchedReleases
-            selectedRelease = app.preFetchedReleases.firstOrNull()
-            isLoadingReleases = false
-        } else {
-            isLoadingReleases = true
-            val fetched = fetchReleasesForApp(app, githubToken, codebergToken)
-            releases = fetched
-            selectedRelease = fetched.firstOrNull()
-            isLoadingReleases = false
-        }
+        isInitialLoading = false
     }
 
     val expectedFileName = if (selectedRelease != null) "${app.platform}_${app.owner}_${app.name}_${selectedRelease!!.version}_${selectedRelease!!.assetName}" else ""
@@ -1310,82 +1315,79 @@ fun AppDetailFullScreen(
     }
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(topBar = { TopAppBar(title = { Text(app.name) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } }, actions = {
-            if (isPrefetchingSource) {
-                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                }
-            } else {
-                IconButton(onClick = {
-                    isPrefetchingSource = true
-                    scope.launch {
-                        val token = if (app.platform == "GitHub") githubToken else codebergToken
-                        val repoInfo = fetchSingleRepoInfo(app.owner, app.name, token, app.platform)
-                        onSourceCodeClick(app, repoInfo?.defaultBranch)
-                        isPrefetchingSource = false
-                    }
-                }) { Icon(Icons.Default.Code, t("source_code", languageSetting)) }
-            }
+            IconButton(onClick = { onSourceCodeClick(app, null) }) { Icon(Icons.Default.Code, t("source_code", languageSetting)) }
             IconButton(onClick = { showStats = true }) { Icon(Icons.Default.Info, null) }
             IconButton(onClick = { showIssues = true }) { Icon(Icons.Default.BugReport, null) }
         }) }) { padding ->
-            Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp, vertical = 16.dp)) {
-                Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AsyncImage(model = app.avatarUrl, contentDescription = "Logo", contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).clip(CircleShape).clickable { showImageZoom = true })
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = app.name, fontWeight = FontWeight.Bold, fontSize = 28.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val token = if (app.platform == "GitHub") githubToken else codebergToken
-                        if (token.isNotBlank()) {
-                            IconButton(onClick = {
-                                scope.launch {
-                                    val success = toggleRepoStar(token, app.owner, app.name, app.platform, isStarred)
-                                    if (success) isStarred = !isStarred
-                                }
-                            }, modifier = Modifier.size(32.dp), enabled = !isCheckingStar) {
-                                if (isCheckingStar) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(
-                                        imageVector = if (isStarred) Icons.Default.Star else Icons.Outlined.StarBorder,
-                                        contentDescription = "Star",
-                                        tint = if (isStarred) Color(0xFFFFD700) else Color.Gray,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+            if (isInitialLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp, vertical = 16.dp)) {
+                    Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState), horizontalAlignment = Alignment.CenterHorizontally) {
+                        AsyncImage(model = app.avatarUrl, contentDescription = "Logo", contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).clip(CircleShape).clickable { showImageZoom = true })
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = app.name, fontWeight = FontWeight.Bold, fontSize = 28.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            val token = if (app.platform == "GitHub") githubToken else codebergToken
+                            if (token.isNotBlank()) {
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        isTogglingStar = true
+                                        val success = toggleRepoStar(token, app.owner, app.name, app.platform, isStarred)
+                                        if (success) isStarred = !isStarred
+                                        isTogglingStar = false
+                                    }
+                                }, modifier = Modifier.size(32.dp), enabled = !isTogglingStar) {
+                                    if (isTogglingStar) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.5.dp, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    } else {
+                                        Icon(
+                                            imageVector = if (isStarred) Icons.Default.Star else Icons.Outlined.StarBorder,
+                                            contentDescription = "Star",
+                                            tint = if (isStarred) Color(0xFFFFD700) else Color.Gray,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "${t("by", languageSetting)} ${app.owner}",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable { onOwnerClick(app.owner, app.platform, app.avatarUrl) }
-                                .padding(4.dp)
-                        )
-                        Text(text = " • ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = app.platform,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable { uriHandler.openUri(app.repoUrl) }
-                                .padding(4.dp)
-                        )
-                    }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${t("by", languageSetting)} ${app.owner}",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { onOwnerClick(app.owner, app.platform, app.avatarUrl) }
+                                    .padding(4.dp)
+                            )
+                            Text(text = " • ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = app.platform,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { uriHandler.openUri(app.repoUrl) }
+                                    .padding(4.dp)
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(12.dp)); Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(modifier = Modifier.padding(16.dp)) { Text(t("description", languageSetting), fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(modifier = Modifier.height(8.dp)); Text(app.description, fontSize = 14.sp) } }
+                        Spacer(modifier = Modifier.height(12.dp)); Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(modifier = Modifier.padding(16.dp)) { Text(t("description", languageSetting), fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(modifier = Modifier.height(8.dp)); Text(app.description, fontSize = 14.sp) } }
 
-                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                        if (isLoadingReleases) Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                        else if (releases.isNullOrEmpty() || selectedRelease == null) Text(t("no_releases", languageSetting), color = Color.Red, modifier = Modifier.padding(16.dp))
+                        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                            if (releases.isNullOrEmpty() || selectedRelease == null) Text(t("no_releases", languageSetting), color = Color.Red, modifier = Modifier.padding(16.dp))
                         else {
                             val currentAssets = releases!!.filter { it.version == selectedRelease!!.version }
                             
@@ -1402,7 +1404,7 @@ fun AppDetailFullScreen(
 
                             if (downloadState.isDownloading) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                                    CircularProgressIndicator(modifier = Modifier.size(36.dp))
+                                    CircularProgressIndicator(modifier = Modifier.size(36.dp), strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                                     Text(downloadState.progress, fontSize = 14.sp)
                                 }
                             }
@@ -1442,6 +1444,7 @@ fun AppDetailFullScreen(
                 }
             }
         }
+    }
 
         CustomMenuOverlay(visible = showVersionSheet, onDismiss = { showVersionSheet = false }, title = t("select_version", languageSetting)) {
             if (releases != null) {
@@ -1653,6 +1656,7 @@ fun VersionItem(release: AppRelease, isSelected: Boolean, onClick: () -> Unit) {
 fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting: String, activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope, refreshTrigger: Int) {
     val context = LocalContext.current
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) } 
+    val expandedRepoKeys = remember { mutableStateMapOf<String, Boolean>() } 
     
     var downloadedFiles by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
     var installedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
@@ -1727,11 +1731,12 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
         }
         val avatarUrl = when (platform) { "GitHub" -> "https://github.com/$owner.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
         val apkIcon = remember(file) { getApkIcon(context, file) }
+        val apkIconPainter = rememberAsyncImagePainter(apkIcon)
 
         AlertDialog(onDismissRequest = { if (!isRepairingLocal) selectedFileForDialog = null }, confirmButton = {}, title = null, text = {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (apkIcon != null) {
-                    AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
+                    AsyncImage(model = apkIcon, placeholder = apkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
                 } else if (avatarUrl != null) {
                     AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
                 } else {
@@ -1801,8 +1806,9 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                 }
                 
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    val appIconPainter = rememberAsyncImagePainter(app.icon)
                     if (app.icon != null) {
-                        AsyncImage(model = app.icon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
+                        AsyncImage(model = app.icon, placeholder = appIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)))
                     } else {
                         Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
                     }
@@ -1892,42 +1898,246 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                         }
                         list.sortedByDescending { it.lastModified() }
                     }
-                    if (displayList.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apks_downloaded", languageSetting)) }
-                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) { items(displayList) { file ->
-                        val fileName = file.name
-                        val parts = fileName.removeSuffix(".apk").split("_")
-                        val isDownloading = activeDownloads[fileName]?.isDownloading == true
-                        val isValid = if (isDownloading) true else isApkValid(context, file)
-                        val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
-                        val apkIcon = remember(file) { if (isValid && !isDownloading && file.exists()) getApkIcon(context, file) else null }
-                        Card(modifier = Modifier.fillMaxWidth().clickable { selectedFileForDialog = file }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
-                                if (apkIcon != null) {
-                                    AsyncImage(model = apkIcon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                } else if (avatarUrl != null) {
-                                    AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    val groupedList = remember(displayList) {
+                        displayList.groupBy { file ->
+                            val parts = file.name.removeSuffix(".apk").split("_")
+                            val platform = parts.getOrNull(0) ?: ""
+                            val owner = parts.getOrNull(1) ?: ""
+                            val appName = parts.getOrNull(2) ?: ""
+                            if (platform.isNotBlank() && owner.isNotBlank() && appName.isNotBlank()) {
+                                "${platform}_${owner}_${appName}"
+                            } else {
+                                file.name
+                            }
+                        }.map { (key, files) ->
+                            val sortedFiles = files.sortedByDescending { it.lastModified() }
+                            val newestFile = sortedFiles.first()
+                            val parts = newestFile.name.removeSuffix(".apk").split("_")
+                            RepoApkGroup(
+                                repoKey = key,
+                                platform = parts.getOrNull(0) ?: "",
+                                owner = parts.getOrNull(1) ?: "",
+                                appName = parts.getOrNull(2) ?: newestFile.name,
+                                files = sortedFiles
+                            )
+                        }
+                    }
+
+                    if (groupedList.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(t("no_apks_downloaded", languageSetting))
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                            items(groupedList, key = { it.repoKey }) { group ->
+                                val newestFile = group.files.first()
+                                val isExpanded = expandedRepoKeys[group.repoKey] == true
+                                val versionCount = group.files.size
+
+                                if (versionCount == 1) {
+                                    val fileName = newestFile.name
+                                    val parts = fileName.removeSuffix(".apk").split("_")
+                                    val isDownloading = activeDownloads[fileName]?.isDownloading == true
+                                    val isValid by produceState(initialValue = true, key1 = newestFile) {
+                                        if (!isDownloading) value = withContext(Dispatchers.IO) { isApkValid(context, newestFile) }
+                                    }
+                                    val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
+                                    val apkIcon by produceState<Drawable?>(initialValue = null, key1 = newestFile) {
+                                        if (isValid && !isDownloading && newestFile.exists()) value = withContext(Dispatchers.IO) { getApkIcon(context, newestFile) }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().clickable { selectedFileForDialog = newestFile },
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val apkIconPainter = rememberAsyncImagePainter(apkIcon)
+                                            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
+                                                if (apkIcon != null) {
+                                                    AsyncImage(model = apkIcon, placeholder = apkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                } else if (avatarUrl != null) {
+                                                    AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                } else {
+                                                    Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(parts.getOrNull(2) ?: newestFile.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
+                                                    if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) }
+                                                }
+                                                Text(if (isDownloading) activeDownloads[fileName]?.progress ?: "" else "${newestFile.length() / (1024 * 1024)} MB", fontSize = 12.sp, color = Color.Gray)
+                                            }
+                                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
+                                        }
+                                    }
                                 } else {
-                                    Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMedium)),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            val fileName = newestFile.name
+                                            val parts = fileName.removeSuffix(".apk").split("_")
+                                            val isDownloading = activeDownloads[fileName]?.isDownloading == true
+                                            val isValid by produceState(initialValue = true, key1 = newestFile) {
+                                                if (!isDownloading) value = withContext(Dispatchers.IO) { isApkValid(context, newestFile) }
+                                            }
+                                            val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
+                                            val apkIcon by produceState<Drawable?>(initialValue = null, key1 = newestFile) {
+                                                if (isValid && !isDownloading && newestFile.exists()) value = withContext(Dispatchers.IO) { getApkIcon(context, newestFile) }
+                                            }
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { expandedRepoKeys[group.repoKey] = !isExpanded }
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                val apkIconPainter = rememberAsyncImagePainter(apkIcon)
+                                                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
+                                                    if (apkIcon != null) {
+                                                        AsyncImage(model = apkIcon, placeholder = apkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                    } else if (avatarUrl != null) {
+                                                        AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                    } else {
+                                                        Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(parts.getOrNull(2) ?: newestFile.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
+                                                        if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) }
+                                                    }
+                                                    Text(
+                                                        if (isExpanded) {
+                                                            "$versionCount ${if (languageSetting == "de") "Versionen verfügbar" else "versions available"}"
+                                                        } else if (isDownloading) {
+                                                            activeDownloads[fileName]?.progress ?: ""
+                                                        } else {
+                                                            "${newestFile.length() / (1024 * 1024)} MB"
+                                                        },
+                                                        fontSize = 12.sp,
+                                                        color = Color.Gray
+                                                    )
+                                                }
+                                                Surface(
+                                                    color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                    shape = RoundedCornerShape(12.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            if (isExpanded) {
+                                                                if (languageSetting == "de") "Schließen" else "Close"
+                                                            } else {
+                                                                "$versionCount ${if (languageSetting == "de") "Versionen" else "Versions"}"
+                                                            },
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Icon(
+                                                            imageVector = if (isExpanded) Icons.Default.Close else Icons.Default.KeyboardArrowDown,
+                                                            contentDescription = if (isExpanded) "Zuklappen" else "Aufklappen",
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            AnimatedVisibility(
+                                                visible = isExpanded,
+                                                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeIn(animationSpec = tween(durationMillis = 150)),
+                                                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut(animationSpec = tween(durationMillis = 150))
+                                            ) {
+                                                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+
+                                                    group.files.forEachIndexed { index, file ->
+                                                        val itemFileName = file.name
+                                                        val itemParts = itemFileName.removeSuffix(".apk").split("_")
+                                                        val isItemDownloading = activeDownloads[itemFileName]?.isDownloading == true
+                                                        val isItemValid by produceState(initialValue = true, key1 = file) {
+                                                            if (!isItemDownloading) value = withContext(Dispatchers.IO) { isApkValid(context, file) }
+                                                        }
+                                                        val itemAvatarUrl = when (itemParts.getOrNull(0)) { "GitHub" -> "https://github.com/${itemParts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
+                                                        val itemApkIcon by produceState<Drawable?>(initialValue = null, key1 = file) {
+                                                            if (isItemValid && !isItemDownloading && file.exists()) value = withContext(Dispatchers.IO) { getApkIcon(context, file) }
+                                                        }
+                                                        val rawVer = itemParts.getOrNull(3) ?: ""
+                                                        val displayVer = if (rawVer.isNotBlank()) "v${rawVer.removePrefix("v")}" else file.name
+
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clickable { selectedFileForDialog = file }
+                                                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            val itemApkIconPainter = rememberAsyncImagePainter(itemApkIcon)
+                                                            Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))) {
+                                                                if (itemApkIcon != null) {
+                                                                    AsyncImage(model = itemApkIcon, placeholder = itemApkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                                } else if (itemAvatarUrl != null) {
+                                                                    AsyncImage(model = itemAvatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                                } else {
+                                                                    Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
+                                                                }
+                                                            }
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Column(modifier = Modifier.weight(1f)) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Text(
+                                                                        displayVer,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        fontSize = 13.sp,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                    if (!isItemValid) { Spacer(Modifier.width(6.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(14.dp)) }
+                                                                    if (isItemDownloading) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) }
+                                                                }
+                                                                Text(if (isItemDownloading) activeDownloads[itemFileName]?.progress ?: "" else "${file.length() / (1024 * 1024)} MB", fontSize = 11.sp, color = Color.Gray)
+                                                            }
+                                                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                                        }
+
+                                                        if (index < group.files.size - 1) {
+                                                            HorizontalDivider(modifier = Modifier.padding(start = 62.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(parts.getOrNull(2) ?: file.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
-                                if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp) }
-                            }
-                            Text(if (isDownloading) activeDownloads[fileName]?.progress ?: "" else "${file.length() / (1024 * 1024)} MB", fontSize = 12.sp, color = Color.Gray)
-                        }; Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
-                        } }
-                    } }
+                        }
+                    }
                 } else {
                     if (installedApps.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apps", languageSetting)) }
                     else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) { items(installedApps) { app ->
                         Card(modifier = Modifier.fillMaxWidth().clickable { selectedAppForDialog = app }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { 
                             Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                val appIconPainter = rememberAsyncImagePainter(app.icon)
                                 Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
                                     if (app.icon != null) {
-                                        AsyncImage(model = app.icon, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                        AsyncImage(model = app.icon, placeholder = appIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                     } else {
                                         Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
                                     }
@@ -2068,7 +2278,7 @@ fun AppUpdatePanelDialog(
                 if (isSearching) {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                             Spacer(Modifier.height(16.dp))
                             Text(t("searching_updates", languageSetting), color = Color.Gray)
                         }
@@ -2183,7 +2393,7 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
         topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } }, actions = { IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, null) } }) },
         floatingActionButton = { if (isOwnProfile && platform == "GitHub") FloatingActionButton(onClick = { showCreateDialog = true }) { Icon(Icons.Default.Add, null) } }
     ) { padding ->
-        if (isLoading) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(); if (statusText.isNotEmpty()) { Spacer(Modifier.height(16.dp)); Text(statusText, color = Color.Gray) } } }
+        if (isLoading) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant); if (statusText.isNotEmpty()) { Spacer(Modifier.height(16.dp)); Text(statusText, color = Color.Gray) } } }
         else if (repos.isEmpty() && statusText.isNotEmpty()) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text(statusText, color = Color.Gray) }
         else LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) { items(repos, key = { it.htmlUrl }) { repo ->
             if (isOwnProfile) {
@@ -2622,7 +2832,7 @@ fun ProjectFilesScreen(
             }
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
 
@@ -2797,7 +3007,7 @@ fun VideoPlayerComponent(url: String, modifier: Modifier = Modifier) {
         )
 
         if (isVideoBuffering) {
-            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(48.dp))
+            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(48.dp), strokeCap = StrokeCap.Round, trackColor = Color.White.copy(alpha = 0.2f))
         }
 
         if (controlsVisible && !isVideoBuffering) {
@@ -2912,7 +3122,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
                 },
                 actions = {
                     if (isSaving) {
-                        CircularProgressIndicator(Modifier.size(24.dp), color = accentColor, strokeWidth = 2.dp)
+                        CircularProgressIndicator(Modifier.size(24.dp), color = accentColor, strokeWidth = 2.5.dp, strokeCap = StrokeCap.Round, trackColor = accentColor.copy(alpha = 0.2f))
                     } else if (!isImageFile(file.name) && !isVideoOrGifFile(file.name)) {
                         TextButton(onClick = {
                             isSaving = true
@@ -2934,7 +3144,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
     ) { padding ->
         if (isLoading) {
             Box(Modifier.fillMaxSize().background(editorBackground), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor)
+                CircularProgressIndicator(color = accentColor, strokeCap = StrokeCap.Round, trackColor = accentColor.copy(alpha = 0.2f))
             }
         } else {
             val verticalScrollState = rememberScrollState()
@@ -2965,7 +3175,7 @@ fun CodeEditorScreen(repo: SimpleRepo, file: ProjectFile, token: String, platfor
                             onError = { isImageLoading = false }
                         )
                         if (isImageLoading) {
-                            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(48.dp))
+                            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(48.dp), strokeCap = StrokeCap.Round, trackColor = accentColor.copy(alpha = 0.2f))
                         }
                     }
                 } else {
@@ -3161,7 +3371,7 @@ fun SourceCodeBrowserScreen(
             }
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
         }
@@ -3222,7 +3432,7 @@ fun SourceCodeViewerScreen(
     ) { padding ->
         if (isLoading) {
             Box(Modifier.fillMaxSize().background(editorBackground), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor)
+                CircularProgressIndicator(color = accentColor, strokeCap = StrokeCap.Round, trackColor = accentColor.copy(alpha = 0.2f))
             }
         } else {
             val verticalScrollState = rememberScrollState()
@@ -3253,7 +3463,7 @@ fun SourceCodeViewerScreen(
                             onError = { isImageLoading = false }
                         )
                         if (isImageLoading) {
-                            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(48.dp))
+                            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(48.dp), strokeCap = StrokeCap.Round, trackColor = accentColor.copy(alpha = 0.2f))
                         }
                     }
                 } else {
@@ -3788,7 +3998,7 @@ fun IssuesScreen(app: OpenSourceApp, githubToken: String, codebergToken: String,
             }
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center), strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 else if (issues.isEmpty()) Text(t("no_issues", languageSetting), Modifier.align(Alignment.Center))
                 else {
                     LazyColumn(Modifier.fillMaxSize()) {
@@ -3888,7 +4098,7 @@ fun PullRequestsScreen(app: OpenSourceApp, githubToken: String, codebergToken: S
             }
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center), strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 else if (prs.isEmpty()) Text(t("no_pull_requests", languageSetting), Modifier.align(Alignment.Center))
                 else {
                     LazyColumn(Modifier.fillMaxSize()) {
@@ -4095,7 +4305,7 @@ fun RepoStatsScreen(app: OpenSourceApp, githubToken: String, codebergToken: Stri
             }
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+                if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center), strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 else {
                     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
                         if (stats != null) {
@@ -4131,7 +4341,27 @@ fun RepoStatsScreen(app: OpenSourceApp, githubToken: String, codebergToken: Stri
                                 ) {
                                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Column(Modifier.weight(1f)) {
-                                            Text(release.version, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(release.version, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                if (release.assetName.isNotBlank()) {
+                                                    Spacer(Modifier.width(10.dp))
+                                                    Surface(
+                                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                        shape = RoundedCornerShape(8.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = release.assetName,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Spacer(Modifier.height(2.dp))
                                             Text(if (release.isPreRelease) t("pre_release", languageSetting) else t("stable_release", languageSetting), fontSize = 12.sp, color = Color.Gray)
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape).padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -4810,7 +5040,7 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
     ) { padding ->
         if (isLoading) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
             }
         } else if (releases.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -4942,7 +5172,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                         Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.error)
                     }
                     if (isSaving) {
-                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.5.dp, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                     } else {
                         TextButton(
                             onClick = {
@@ -5481,8 +5711,8 @@ fun DeviceAppPicker(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var installedApps by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var filteredApps by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var installedApps by remember { mutableStateOf<List<DeviceAppItem>>(emptyList()) }
+    var filteredApps by remember { mutableStateOf<List<DeviceAppItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
     var selectedApp by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -5490,9 +5720,14 @@ fun DeviceAppPicker(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
-            val apps = pm.getInstalledPackages(0).map {
-                it.packageName to (it.applicationInfo?.loadLabel(pm)?.toString() ?: it.packageName)
-            }.sortedBy { it.second.lowercase() }
+            val apps = pm.getInstalledPackages(0).map { info ->
+                val pkg = info.packageName
+                val label = info.applicationInfo?.loadLabel(pm)?.toString() ?: pkg
+                val flags = info.applicationInfo?.flags ?: 0
+                val isSystem = (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                               (flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                DeviceAppItem(pkg, label, isSystem)
+            }.sortedBy { it.label.lowercase() }
             withContext(Dispatchers.Main) {
                 installedApps = apps
                 filteredApps = apps
@@ -5505,7 +5740,7 @@ fun DeviceAppPicker(
         filteredApps = if (searchQuery.isBlank()) {
             installedApps
         } else {
-            installedApps.filter { it.second.contains(searchQuery, ignoreCase = true) || it.first.contains(searchQuery, ignoreCase = true) }
+            installedApps.filter { it.label.contains(searchQuery, ignoreCase = true) || it.packageName.contains(searchQuery, ignoreCase = true) }
         }
     }
 
@@ -5546,28 +5781,49 @@ fun DeviceAppPicker(
                     Spacer(Modifier.height(16.dp))
                     if (isLoading) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                         }
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(filteredApps) { (pkg, label) ->
+                            items(filteredApps) { item ->
                                 Card(
-                                    modifier = Modifier.fillMaxWidth().clickable { selectedApp = pkg to label },
+                                    modifier = Modifier.fillMaxWidth().clickable { selectedApp = item.packageName to item.label },
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                                 ) {
                                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        val icon = remember(pkg) {
-                                            try { context.packageManager.getApplicationIcon(pkg) } catch (e: Exception) { null }
+                                        val icon = remember(item.packageName) {
+                                            try { context.packageManager.getApplicationIcon(item.packageName) } catch (e: Exception) { null }
                                         }
+                                        val iconPainter = rememberAsyncImagePainter(icon)
                                         if (icon != null) {
-                                            AsyncImage(model = icon, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
+                                            AsyncImage(model = icon, placeholder = iconPainter, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
                                         } else {
                                             Icon(Icons.Default.Android, null, modifier = Modifier.size(40.dp), tint = Color.Gray)
                                         }
                                         Spacer(Modifier.width(12.dp))
-                                        Column {
-                                            Text(label, fontWeight = FontWeight.Bold)
-                                            Text(pkg, fontSize = 12.sp, color = Color.Gray)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(item.label, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                                Spacer(Modifier.width(8.dp))
+                                                val (badgeBg, badgeFg) = if (item.isSystemApp) {
+                                                    MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+                                                } else {
+                                                    MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                                                }
+                                                Surface(
+                                                    color = badgeBg,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = if (item.isSystemApp) t("system_app", languageSetting) else t("user_app", languageSetting),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = badgeFg,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            Text(item.packageName, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                     }
                                 }
@@ -5755,7 +6011,7 @@ fun LinkRepoDialog(
                     Spacer(Modifier.height(16.dp))
                     if (isLoading) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                         }
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -5794,7 +6050,7 @@ fun LinkRepoDialog(
                         Spacer(Modifier.height(16.dp))
                         Text(verificationError!!, textAlign = TextAlign.Center)
                     } else {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                         Spacer(Modifier.height(16.dp))
                         Text(verificationStatus, textAlign = TextAlign.Center)
                     }
@@ -5818,27 +6074,32 @@ fun LinkAppDialog(
     onImportComplete: () -> Unit
 ) {
     val context = LocalContext.current
-    var installedApps by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var filteredApps by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var installedApps by remember { mutableStateOf<List<DeviceAppItem>>(emptyList()) }
+    var filteredApps by remember { mutableStateOf<List<DeviceAppItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf(repo.name) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
-            val apps = pm.getInstalledPackages(0).map {
-                it.packageName to (it.applicationInfo?.loadLabel(pm)?.toString() ?: it.packageName)
-            }.sortedBy { it.second.lowercase() }
+            val apps = pm.getInstalledPackages(0).map { info ->
+                val pkg = info.packageName
+                val label = info.applicationInfo?.loadLabel(pm)?.toString() ?: pkg
+                val flags = info.applicationInfo?.flags ?: 0
+                val isSystem = (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                               (flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                DeviceAppItem(pkg, label, isSystem)
+            }.sortedBy { it.label.lowercase() }
             withContext(Dispatchers.Main) {
                 installedApps = apps
-                filteredApps = apps.filter { it.second.contains(repo.name, ignoreCase = true) }
+                filteredApps = apps.filter { it.label.contains(repo.name, ignoreCase = true) }
                 isLoading = false
             }
         }
     }
 
     LaunchedEffect(searchQuery) {
-        filteredApps = installedApps.filter { it.second.contains(searchQuery, ignoreCase = true) || it.first.contains(searchQuery, ignoreCase = true) }
+        filteredApps = installedApps.filter { it.label.contains(searchQuery, ignoreCase = true) || it.packageName.contains(searchQuery, ignoreCase = true) }
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -5867,17 +6128,17 @@ fun LinkAppDialog(
                 Spacer(Modifier.height(16.dp))
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                     }
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(filteredApps) { (pkg, label) ->
+                        items(filteredApps) { item ->
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable {
                                     val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
                                     val metaMapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet())?.toMutableSet() ?: mutableSetOf()
-                                    metaMapping.removeAll { it.startsWith("$pkg|") }
-                                    metaMapping.add("$pkg|${repo.platform}|${repo.owner}|${repo.name}")
+                                    metaMapping.removeAll { it.startsWith("${item.packageName}|") }
+                                    metaMapping.add("${item.packageName}|${repo.platform}|${repo.owner}|${repo.name}")
                                     prefs.edit().putStringSet("INSTALLED_APPS_META", metaMapping).apply()
                                     Toast.makeText(context, t("app_imported_success", languageSetting), Toast.LENGTH_SHORT).show()
                                     onImportComplete()
@@ -5885,16 +6146,37 @@ fun LinkAppDialog(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    val icon = try { context.packageManager.getApplicationIcon(pkg) } catch (e: Exception) { null }
+                                    val icon = remember(item.packageName) { try { context.packageManager.getApplicationIcon(item.packageName) } catch (e: Exception) { null } }
+                                    val iconPainter = rememberAsyncImagePainter(icon)
                                     if (icon != null) {
-                                        AsyncImage(model = icon, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
+                                        AsyncImage(model = icon, placeholder = iconPainter, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
                                     } else {
                                         Icon(Icons.Default.Android, null, modifier = Modifier.size(40.dp), tint = Color.Gray)
                                     }
                                     Spacer(Modifier.width(12.dp))
-                                    Column {
-                                        Text(label, fontWeight = FontWeight.Bold)
-                                        Text(pkg, fontSize = 12.sp, color = Color.Gray)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(item.label, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                            Spacer(Modifier.width(8.dp))
+                                            val (badgeBg, badgeFg) = if (item.isSystemApp) {
+                                                MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                                            }
+                                            Surface(
+                                                color = badgeBg,
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (item.isSystemApp) t("system_app", languageSetting) else t("user_app", languageSetting),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = badgeFg,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(item.packageName, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }
