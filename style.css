@@ -346,6 +346,43 @@ body.fullscreen-active .simulator-header {
   background-size: 100% auto;
   background-repeat: no-repeat;
   background-color: #000;
+  container-type: inline-size;
+}
+
+.preview-version-tag {
+  position: absolute;
+  z-index: 5;
+  left: 29%;
+  top: 66.6%;
+  width: 8.241%;
+  height: 2.313%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #151119;
+  box-shadow: -2px 0 0 #151119, 2px 0 0 #151119;
+  color: #cbc4d1;
+  pointer-events: none;
+  font-size: clamp(8px, 4.5cqw, 15px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.preview-version-tag.active {
+  display: flex;
+}
+
+.preview-version-prefix {
+  display: inline-block;
+  transform: scaleX(0.75);
+  transform-origin: right center;
+}
+
+.preview-version-six {
+  display: inline-block;
+  transform: scaleX(0.9);
+  transform-origin: left center;
 }
 
 .stars-overlay {

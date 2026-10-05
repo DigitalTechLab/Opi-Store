@@ -18,6 +18,7 @@ const versionTag = $('version-tag');
 const fileSize = $('file-size');
 const totalDownloadsTag = $('total-downloads');
 const appImage = $('app-preview-image');
+const previewVersionTag = $('preview-version-tag');
 const starsOverlay = $('stars-overlay');
 const starsCount = $('stars-count');
 const startHint = $('start-hint');
@@ -60,13 +61,33 @@ async function fetchRepoStats() {
     const releases = await response.json();
     if (releases.length === 0) return;
 
-    const latestRelease = releases[0];
-    const latestApk = (latestRelease.assets || []).find((asset) => asset.name.toLowerCase().endsWith('.apk'));
-    if (latestApk) {
+    const latestRelease = releases.find((release) =>
+      (release.assets || []).some((asset) => asset.name.toLowerCase().endsWith('.apk')));
+    if (latestRelease) {
+      const latestApk = latestRelease.assets.find((asset) => asset.name.toLowerCase().endsWith('.apk'));
       realDownloadBtn.href = latestApk.browser_download_url;
       realDownloadBtn.classList.remove('disabled');
       openDownloadPageBtn.classList.remove('disabled');
       versionTag.innerText = latestRelease.tag_name || 'Latest';
+      const previewTag = latestRelease.tag_name || 'Latest';
+      previewVersionTag.replaceChildren();
+      const tagContent = previewTag.startsWith('v') ? previewTag.slice(1) : previewTag;
+      if (previewTag.startsWith('v')) {
+        const versionPrefix = document.createElement('span');
+        versionPrefix.className = 'preview-version-prefix';
+        versionPrefix.innerText = 'v';
+        previewVersionTag.append(versionPrefix);
+      }
+      if (tagContent.endsWith('6')) {
+        previewVersionTag.append(document.createTextNode(tagContent.slice(0, -1)));
+        const finalSix = document.createElement('span');
+        finalSix.className = 'preview-version-six';
+        finalSix.innerText = '6';
+        previewVersionTag.append(finalSix);
+      } else {
+        previewVersionTag.append(document.createTextNode(tagContent));
+      }
+      previewVersionTag.classList.toggle('active', appImage.src.includes('Photo1'));
       fileSize.innerText = formatBytes(latestApk.size);
     }
 
@@ -495,6 +516,7 @@ window.changeAppScreen = function changeAppScreen(newSrc) {
 
 appImage.addEventListener('load', () => {
   appImage.style.opacity = '1';
+  previewVersionTag.classList.toggle('active', appImage.src.includes('Photo1') && Boolean(previewVersionTag.textContent));
   if (appImage.src.includes('Photo2')) {
     starsOverlay.classList.add('active');
     setTimeout(() => { starsOverlay.style.opacity = '1'; }, 10);
