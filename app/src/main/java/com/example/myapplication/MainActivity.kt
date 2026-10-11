@@ -545,11 +545,80 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
     var selectedRepoForReleases by remember { mutableStateOf<SimpleRepo?>(null) }
     var selectedReleaseForEdit by remember { mutableStateOf<FullRelease?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        BackHandler(enabled = true) {
-            if (selectedTab != 0) {
-                selectedTab = 0
+    if (showUpdateScreen != null) {
+        UpdateScreen(
+            currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0" } catch (e: Exception) { "0.0" },
+            newVersion = showUpdateScreen!!.version,
+            changelog = showUpdateScreen!!.body,
+            downloadUrl = showUpdateScreen!!.downloadUrl,
+            onCancel = {
+                skippedVersion = showUpdateScreen!!.version
+                sharedPrefs.edit().putString("SKIPPED_VERSION", skippedVersion).apply()
+                showUpdateScreen = null
+            },
+            languageSetting = languageSetting,
+            context = context,
+            scope = scope
+        )
+    } else if (selectedAppForSourceCode != null) {
+        Box {
+            SourceCodeBrowserScreen(app = selectedAppForSourceCode!!, token = if (selectedAppForSourceCode!!.platform == "GitHub") githubToken else codebergToken, onBack = { selectedAppForSourceCode = null; selectedSourceBranch = null }, onFileClick = { if (it.type == "file") selectedFileForView = it }, languageSetting = languageSetting, selectedBranch = selectedSourceBranch, onBranchChange = { selectedSourceBranch = it })
+            if (selectedFileForView != null) {
+                SourceCodeViewerScreen(app = selectedAppForSourceCode!!, file = selectedFileForView!!, token = if (selectedAppForSourceCode!!.platform == "GitHub") githubToken else codebergToken, onBack = { selectedFileForView = null }, languageSetting = languageSetting, branch = selectedSourceBranch)
             }
+        }
+    } else if (selectedRepoForFiles != null) {
+        Box {
+            ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null; selectedBranch = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting, selectedBranch = selectedBranch, onBranchChange = { selectedBranch = it })
+            if (selectedFileForEdit != null) {
+                CodeEditorScreen(repo = selectedRepoForFiles!!, file = selectedFileForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedFileForEdit = null }, languageSetting = languageSetting, branch = selectedBranch)
+            }
+        }
+    } else if (selectedReleaseForEdit != null && selectedRepoForReleases != null) {
+        ReleaseEditScreen(repo = selectedRepoForReleases!!, release = selectedReleaseForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedReleaseForEdit = null }, languageSetting = languageSetting)
+    } else if (selectedRepoForReleases != null) {
+        ReleasesManagementScreen(repo = selectedRepoForReleases!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedReleaseForEdit = null; selectedRepoForReleases = null }, onReleaseClick = { selectedReleaseForEdit = it }, languageSetting = languageSetting)
+    } else if (selectedRepoForPRs != null) {
+        PullRequestsScreen(app = OpenSourceApp(id = "${selectedRepoForPRs!!.owner}/${selectedRepoForPRs!!.name}", name = selectedRepoForPRs!!.name, owner = selectedRepoForPRs!!.owner, platform = fullRepoListPlatform, description = selectedRepoForPRs!!.description, repoUrl = selectedRepoForPRs!!.htmlUrl, avatarUrl = ""), githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, onUserClick = { user, plat, avatar -> showFullRepoListForUser = user; fullRepoListPlatform = plat; fullRepoListAvatarUrl = avatar; fullRepoListAppsOnly = true; isViewingOwnProfile = false; selectedRepoForPRs = null }, onDismiss = { selectedRepoForPRs = null })
+    } else if (showFullRepoListForUser != null) {
+        FullRepoListScreen(
+            owner = showFullRepoListForUser!!,
+            title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else if (isViewingOwnProfile) t("my_repository_editor", languageSetting) else t("my_repositories", languageSetting),
+            token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken,
+            platform = fullRepoListPlatform,
+            appsOnly = fullRepoListAppsOnly,
+            isOwnProfile = isViewingOwnProfile,
+            ownerAvatarUrl = fullRepoListAvatarUrl,
+            onBack = { showFullRepoListForUser = null },
+            onAppSelected = { showFullRepoListForUser = null; selectedAppForDetail = it },
+            onRepoSelected = { selectedBranch = it.defaultBranch; selectedRepoForFiles = it },
+            onRepoSelectedPR = { selectedRepoForPRs = it },
+            onRepoSelectedReleases = { selectedRepoForReleases = it },
+            githubToken = githubToken,
+            codebergToken = codebergToken,
+            languageSetting = languageSetting
+        )
+    } else if (selectedAppForDetail != null) {
+        AppDetailFullScreen(
+            app = selectedAppForDetail!!,
+            githubToken = githubToken,
+            codebergToken = codebergToken,
+            onBack = { selectedAppForDetail = null },
+            onOwnerClick = { owner, platform, avatar ->
+                fullRepoListPlatform = platform
+                fullRepoListAppsOnly = true
+                fullRepoListAvatarUrl = avatar
+                isViewingOwnProfile = false
+                showFullRepoListForUser = owner
+            },
+            languageSetting = languageSetting,
+            activeDownloads = activeDownloads,
+            globalScope = scope,
+            onSourceCodeClick = { app, branch -> selectedSourceBranch = branch; selectedAppForSourceCode = app }
+        )
+    } else {
+        BackHandler(enabled = selectedTab != 0) {
+            selectedTab = 0
         }
         Scaffold(
             bottomBar = {
@@ -604,103 +673,6 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
                         languageSetting = languageSetting
                     )
                 }
-            }
-        }
-
-        if (selectedRepoForFiles != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                ProjectFilesScreen(repo = selectedRepoForFiles!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForFiles = null; selectedBranch = null }, onFileClick = { if (it.type == "file") selectedFileForEdit = it }, languageSetting = languageSetting, selectedBranch = selectedBranch, onBranchChange = { selectedBranch = it })
-                if (selectedFileForEdit != null) {
-                    CodeEditorScreen(repo = selectedRepoForFiles!!, file = selectedFileForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedFileForEdit = null }, languageSetting = languageSetting, branch = selectedBranch)
-                }
-            }
-        }
-
-        if (selectedRepoForReleases != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                if (selectedReleaseForEdit != null) {
-                    ReleaseEditScreen(repo = selectedRepoForReleases!!, release = selectedReleaseForEdit!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedReleaseForEdit = null }, languageSetting = languageSetting)
-                } else {
-                    ReleasesManagementScreen(repo = selectedRepoForReleases!!, token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken, platform = fullRepoListPlatform, onBack = { selectedRepoForReleases = null }, onReleaseClick = { selectedReleaseForEdit = it }, languageSetting = languageSetting)
-                }
-            }
-        }
-
-        if (selectedRepoForPRs != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                PullRequestsScreen(app = OpenSourceApp(id = "${selectedRepoForPRs!!.owner}/${selectedRepoForPRs!!.name}", name = selectedRepoForPRs!!.name, owner = selectedRepoForPRs!!.owner, platform = fullRepoListPlatform, description = selectedRepoForPRs!!.description, repoUrl = selectedRepoForPRs!!.htmlUrl, avatarUrl = ""), githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, onUserClick = { user, plat, avatar -> showFullRepoListForUser = user; fullRepoListPlatform = plat; fullRepoListAvatarUrl = avatar; fullRepoListAppsOnly = true; isViewingOwnProfile = false }, onDismiss = { selectedRepoForPRs = null })
-            }
-        }
-
-        if (selectedAppForDetail != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                AppDetailFullScreen(
-                    app = selectedAppForDetail!!,
-                    githubToken = githubToken,
-                    codebergToken = codebergToken,
-                    onBack = { selectedAppForDetail = null },
-                    onOwnerClick = { owner, platform, avatar ->
-                        fullRepoListPlatform = platform
-                        fullRepoListAppsOnly = true
-                        fullRepoListAvatarUrl = avatar
-                        isViewingOwnProfile = false
-                        showFullRepoListForUser = owner
-                    },
-                    languageSetting = languageSetting,
-                    activeDownloads = activeDownloads,
-                    globalScope = scope,
-                    onSourceCodeClick = { app, branch -> selectedSourceBranch = branch; selectedAppForSourceCode = app }
-                )
-            }
-        }
-
-        if (showFullRepoListForUser != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                FullRepoListScreen(
-                    owner = showFullRepoListForUser!!,
-                    title = if (fullRepoListAppsOnly) "${t("by", languageSetting)} $showFullRepoListForUser" else if (isViewingOwnProfile) t("my_repository_editor", languageSetting) else t("my_repositories", languageSetting),
-                    token = if (fullRepoListPlatform == "GitHub") githubToken else codebergToken,
-                    platform = fullRepoListPlatform,
-                    appsOnly = fullRepoListAppsOnly,
-                    isOwnProfile = isViewingOwnProfile,
-                    ownerAvatarUrl = fullRepoListAvatarUrl,
-                    onBack = { showFullRepoListForUser = null },
-                    onAppSelected = { selectedAppForDetail = it },
-                    onRepoSelected = { selectedBranch = it.defaultBranch; selectedRepoForFiles = it },
-                    onRepoSelectedPR = { selectedRepoForPRs = it },
-                    onRepoSelectedReleases = { selectedRepoForReleases = it },
-                    githubToken = githubToken,
-                    codebergToken = codebergToken,
-                    languageSetting = languageSetting
-                )
-            }
-        }
-
-        if (selectedAppForSourceCode != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                SourceCodeBrowserScreen(app = selectedAppForSourceCode!!, token = if (selectedAppForSourceCode!!.platform == "GitHub") githubToken else codebergToken, onBack = { selectedAppForSourceCode = null; selectedSourceBranch = null }, onFileClick = { if (it.type == "file") selectedFileForView = it }, languageSetting = languageSetting, selectedBranch = selectedSourceBranch, onBranchChange = { selectedSourceBranch = it })
-                if (selectedFileForView != null) {
-                    SourceCodeViewerScreen(app = selectedAppForSourceCode!!, file = selectedFileForView!!, token = if (selectedAppForSourceCode!!.platform == "GitHub") githubToken else codebergToken, onBack = { selectedFileForView = null }, languageSetting = languageSetting, branch = selectedSourceBranch)
-                }
-            }
-        }
-
-        if (showUpdateScreen != null) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                UpdateScreen(
-                    currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0" } catch (e: Exception) { "0.0" },
-                    newVersion = showUpdateScreen!!.version,
-                    changelog = showUpdateScreen!!.body,
-                    downloadUrl = showUpdateScreen!!.downloadUrl,
-                    onCancel = {
-                        skippedVersion = showUpdateScreen!!.version
-                        sharedPrefs.edit().putString("SKIPPED_VERSION", skippedVersion).apply()
-                        showUpdateScreen = null
-                    },
-                    languageSetting = languageSetting,
-                    context = context,
-                    scope = scope
-                )
             }
         }
     }
@@ -4015,6 +3987,43 @@ private suspend fun fetchDetailedReleases(owner: String, repo: String, token: St
     list
 }
 
+private suspend fun createRelease(owner: String, repo: String, token: String, platform: String, tagName: String, name: String, body: String = "", isPreRelease: Boolean = false): FullRelease? = withContext(Dispatchers.IO) {
+    try {
+        val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/releases" else "https://codeberg.org/api/v1/repos/$owner/$repo/releases"
+        val authHeader = if (platform == "GitHub") "Bearer $token" else "token $token"
+        val json = JSONObject()
+            .put("tag_name", tagName)
+            .put("name", name)
+            .put("title", name)
+            .put("body", body)
+            .put("draft", false)
+            .put("prerelease", isPreRelease)
+        val bodyReq = json.toString().toRequestBody("application/json".toMediaType())
+        httpClient.newCall(Request.Builder().url(url).post(bodyReq).addHeader("Authorization", authHeader).build()).execute().use { resp ->
+            if (!resp.isSuccessful) return@withContext null
+            val respStr = resp.body?.string() ?: return@withContext null
+            val rel = JSONObject(respStr)
+            val assets = mutableListOf<ReleaseAsset>()
+            val assetsArr = rel.optJSONArray("assets")
+            if (assetsArr != null) {
+                for (a in 0 until assetsArr.length()) {
+                    val asset = assetsArr.getJSONObject(a)
+                    assets.add(ReleaseAsset(asset.getString("id"), asset.getString("name"), asset.optString("browser_download_url", ""), asset.optLong("size", 0), asset.optInt("download_count", 0)))
+                }
+            }
+            FullRelease(
+                id = rel.getString("id"),
+                tagName = rel.getString("tag_name"),
+                name = rel.optString("name", rel.optString("title", name)),
+                body = rel.optString("body", body),
+                isPreRelease = rel.optBoolean("prerelease", isPreRelease),
+                assets = assets,
+                htmlUrl = rel.optString("html_url", "")
+            )
+        }
+    } catch (e: Exception) { null }
+}
+
 private suspend fun updateRelease(owner: String, repo: String, token: String, platform: String, releaseId: String, tagName: String, name: String, body: String): Boolean = withContext(Dispatchers.IO) {
     try {
         val url = if (platform == "GitHub") "https://api.github.com/repos/$owner/$repo/releases/$releaseId" else "https://codeberg.org/api/v1/repos/$owner/$repo/releases/$releaseId"
@@ -5303,11 +5312,18 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
     val scope = rememberCoroutineScope()
     var releases by remember { mutableStateOf<List<FullRelease>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newTagName by remember { mutableStateOf("") }
+    var newReleaseTitle by remember { mutableStateOf("") }
+    var isCreating by remember { mutableStateOf(false) }
+    var availableTags by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showTagDropdown by remember { mutableStateOf(false) }
 
     fun refresh() {
         isLoading = true
         scope.launch {
             releases = fetchDetailedReleases(repo.owner, repo.name, token, platform)
+            availableTags = fetchTags(token, repo.owner, repo.name, platform)
             isLoading = false
         }
     }
@@ -5327,6 +5343,18 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
                 actions = { IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, null) } }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    newTagName = ""
+                    newReleaseTitle = ""
+                    showCreateDialog = true
+                },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+            }
         }
     ) { padding ->
         if (isLoading) {
@@ -5404,6 +5432,85 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
                 }
             }
         }
+
+        if (showCreateDialog) {
+            AlertDialog(
+                onDismissRequest = { if (!isCreating) showCreateDialog = false },
+                title = { Text(if (languageSetting == "de") "Neues Release erstellen" else "Create New Release") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box {
+                            OutlinedTextField(
+                                value = newTagName,
+                                onValueChange = { newTagName = it },
+                                label = { Text(t("tag_name", languageSetting)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                trailingIcon = {
+                                    if (availableTags.isNotEmpty()) {
+                                        IconButton(onClick = { showTagDropdown = !showTagDropdown }) {
+                                            Icon(Icons.Default.ArrowDropDown, null)
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenu(
+                                expanded = showTagDropdown,
+                                onDismissRequest = { showTagDropdown = false }
+                            ) {
+                                availableTags.forEach { tag ->
+                                    DropdownMenuItem(
+                                        text = { Text(tag) },
+                                        onClick = {
+                                            newTagName = tag
+                                            if (newReleaseTitle.isEmpty()) newReleaseTitle = tag
+                                            showTagDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = newReleaseTitle,
+                            onValueChange = { newReleaseTitle = it },
+                            label = { Text(t("release_title", languageSetting)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        enabled = newTagName.isNotBlank() && !isCreating,
+                        onClick = {
+                            isCreating = true
+                            scope.launch {
+                                val titleToUse = newReleaseTitle.ifBlank { newTagName }
+                                val newRel = createRelease(repo.owner, repo.name, token, platform, newTagName.trim(), titleToUse.trim())
+                                if (newRel != null) {
+                                    showCreateDialog = false
+                                    releases = listOf(newRel) + releases.filter { it.id != newRel.id }
+                                    refresh()
+                                }
+                                isCreating = false
+                            }
+                        }
+                    ) {
+                        if (isCreating) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        else Text(t("create", languageSetting))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !isCreating,
+                        onClick = { showCreateDialog = false }
+                    ) {
+                        Text(t("cancel", languageSetting))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -5426,6 +5533,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
     var stagedUploads by remember { mutableStateOf<List<Pair<String, ByteArray>>>(emptyList()) }
     var showCreateTagDialog by remember { mutableStateOf(false) }
     var newTagNameInput by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
@@ -5433,6 +5541,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
 
     LaunchedEffect(Unit) {
         availableTags = fetchTags(token, repo.owner, repo.name, platform)
+        isLoading = false
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -5492,7 +5601,12 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
             )
         }
     ) { padding ->
-        Column(
+        if (isLoading) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
+            }
+        } else {
+            Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -5680,6 +5794,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
             Spacer(Modifier.height(40.dp))
             
             Spacer(Modifier.height(80.dp))
+        }
         }
     }
 
