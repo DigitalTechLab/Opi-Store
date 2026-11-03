@@ -22,13 +22,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.res.Configuration
+import java.util.Locale
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.compose.foundation.BorderStroke
@@ -63,6 +67,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -127,193 +132,218 @@ data class DeviceAppItem(val packageName: String, val label: String, val isSyste
 data class RepoApkGroup(val repoKey: String, val platform: String, val owner: String, val appName: String, val files: List<File>)
 
 
-private fun t(key: String, lang: String): String {
-    val isDe = lang == "de"
+private fun getStringResId(key: String): Int {
     return when (key) {
-        "tab_search" -> if (isDe) "Suche" else "Search"
-        "tab_apk_manager" -> if (isDe) "APK Manager" else "APK Manager"
-        "tab_account" -> if (isDe) "Account" else "Account"
-        "tab_settings" -> if (isDe) "Settings" else "Settings"
-        "search_title" -> "🚀 Opi Store"
-        "search_hint" -> if (isDe) "Suche..." else "Search..."
-        "status_loading_repo" -> if (isDe) "Lade Repo vom Link..." else "Loading repo from link..."
-        "status_no_apks" -> if (isDe) "Dieses Projekt hat keine Android APKs." else "This project has no Android APKs."
-        "status_no_project" -> if (isDe) "Kein passendes Projekt gefunden." else "No matching project found."
-        "status_searching" -> if (isDe) "Suche und filtere APKs..." else "Searching and filtering APKs..."
-        "status_no_apps_found" -> if (isDe) "Keine Android-Apps mit APK gefunden." else "No Android apps with APK found."
-        "status_error" -> if (isDe) "Fehler aufgetreten." else "Error occurred."
-        "by" -> if (isDe) "von" else "by"
-        "followers" -> if (isDe) "Follower" else "Followers"
-        "description" -> if (isDe) "Beschreibung" else "Description"
-        "no_releases" -> if (isDe) "Keine APK-Releases für dieses Projekt gefunden." else "No APK releases found for this project."
-        "stable_release" -> if (isDe) "Stable Release" else "Stable Release"
-        "pre_release" -> if (isDe) "Pre-Release" else "Pre-Release"
-        "downloading" -> if (isDe) "Lade..." else "Downloading..."
-        "download_apk" -> if (isDe) "APK Herunterladen" else "Download APK"
-        "already_downloaded" -> if (isDe) "Bereits geladen (Installieren)" else "Already downloaded (Install)"
-        "select_version" -> if (isDe) "Version auswählen" else "Select Version"
-        "select_asset" -> if (isDe) "Datei auswählen" else "Select Asset"
-        "stable_build" -> if (isDe) "Stable Build" else "Stable Build"
-        "beta_experimental" -> if (isDe) "Beta / Experimental" else "Beta / Experimental"
-        "apk_manager_title" -> if (isDe) "📦 APK Manager" else "APK Manager"
-        "apk_manager_subtitle" -> if (isDe) "Tippe auf eine App, um sie zu verwalten." else "Tap on an app to manage it."
-        "no_apks_downloaded" -> if (isDe) "Noch keine APKs heruntergeladen." else "No APKs downloaded yet."
-        "install" -> if (isDe) "Installieren" else "Install"
-        "repair" -> if (isDe) "Reparieren" else "Repair"
-        "apk_corrupted" -> if (isDe) "APK unvollständig oder beschädigt!" else "APK incomplete or corrupted!"
-        "repairing" -> if (isDe) "Repariere..." else "Repairing..."
-        "delete_apk" -> if (isDe) "APK Datei löschen" else "Delete APK file"
-        "issues" -> if (isDe) "Issues" else "Issues"
-        "open" -> if (isDe) "Offen" else "Open"
-        "closed" -> if (isDe) "Geschlossen" else "Closed"
-        "no_issues" -> if (isDe) "Keine Issues gefunden." else "No issues found."
-        "new_issue" -> if (isDe) "Neues Issue" else "New Issue"
-        "title" -> if (isDe) "Titel" else "Title"
-        "body" -> if (isDe) "Beschreibung" else "Body"
-        "post" -> if (isDe) "Posten" else "Post"
-        "comments" -> if (isDe) "Kommentare" else "Comments"
-        "write_comment" -> if (isDe) "Kommentar schreiben..." else "Write a comment..."
-        "settings_title" -> if (isDe) "⚙️ Einstellungen" else "⚙️ Settings"
-        "design" -> if (isDe) "Design" else "Design"
-        "language" -> if (isDe) "Sprache" else "Language"
-        "select_design" -> if (isDe) "Design wählen" else "Select Design"
-        "select_language" -> if (isDe) "Sprache wählen" else "Select Language"
-        "theme_system" -> if (isDe) "System" else "System"
-        "theme_light" -> if (isDe) "Hell" else "Light"
-        "theme_dark" -> if (isDe) "Dunkel" else "Dark"
-        "profile_edit_title" -> if (isDe) "Profil bearbeiten" else "Edit Profile"
-        "display_name" -> if (isDe) "Anzeigename" else "Display Name"
-        "bio" -> if (isDe) "Bio" else "Bio"
-        "save" -> if (isDe) "Speichern" else "Save"
-        "cancel" -> if (isDe) "Abbrechen" else "Cancel"
-        "tap_to_edit" -> if (isDe) "Name/Bio tippen zum Bearbeiten" else "Tap Name/Bio to edit"
-        "change_token" -> if (isDe) "Token ändern" else "Change token"
-        "my_repositories" -> if (isDe) "Meine Repositories" else "My Repositories"
-        "my_repository_editor" -> if (isDe) "Mein Repository Editor" else "My Repository Editor"
-        "starred" -> if (isDe) "Markiert (Starred)" else "Starred"
-        "login_title" -> if (isDe) "Login" else "Login"
-        "personal_access_token" -> if (isDe) "Personal Access Token" else "Personal Access Token"
-        "search_apps_hint" -> if (isDe) "Suche Apps..." else "Search apps..."
-        "no_apps" -> if (isDe) "Keine Apps." else "No apps."
-        "delete" -> if (isDe) "Löschen" else "Delete"
-        "rename" -> if (isDe) "Umbenennen" else "Rename"
-        "rename_project_title" -> if (isDe) "Projekt umbenennen" else "Rename Project"
-        "new_name" -> if (isDe) "Neuer Name" else "New Name"
-        "new_github_project" -> if (isDe) "Neues GitHub Projekt" else "New GitHub Project"
-        "project_name" -> if (isDe) "Projektname" else "Project Name"
-        "private_repository" -> if (isDe) "Privates Repository" else "Private repository"
-        "create" -> if (isDe) "Erstellen" else "Create"
-        "delete_project_title" -> if (isDe) "🗑️ Projekt löschen?" else "🗑️ Delete project?"
-        "delete_project_confirm" -> if (isDe) "Möchtest du das Repository wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden!" else "Do you really want to delete the repository permanently? This action cannot be undone!"
-        "delete_issue_title" -> if (isDe) "Issue löschen?" else "Delete Issue?"
-        "delete_issue_confirm" -> if (isDe) "Möchtest du dieses Issue wirklich löschen?" else "Do you really want to delete this issue?"
-        "delete_comment_title" -> if (isDe) "Kommentar löschen?" else "Delete Comment?"
-        "delete_comment_confirm" -> if (isDe) "Möchtest du diesen Kommentar wirklich löschen?" else "Do you really want to delete this comment?"
-        "yes_delete" -> if (isDe) "Ja, Löschen" else "Yes, delete"
-        "uploaded" -> if (isDe) "Hochgeladen!" else "Uploaded!"
-        "upload_image" -> if (isDe) "Bild hochladen" else "Upload image"
-        "edit_via_app" -> if (isDe) "Edit via App" else "Edit via App"
-        "upload_via_app" -> if (isDe) "Upload via App" else "Upload via App"
-        "mb_loaded" -> if (isDe) "MB geladen" else "MB loaded"
-        "stable_releases_header" -> if (isDe) "✅ STABLE RELEASES" else "✅ STABLE RELEASES"
-        "pre_releases_header" -> if (isDe) "⚠️ PRE-RELEASES" else "⚠️ PRE-RELEASES"
-        "changelog" -> if (isDe) "Changelog" else "Changelog"
-        "tutorial" -> if (isDe) "Tutorial" else "Tutorial"
-        "repo_private" -> if (isDe) "privat" else "private"
-        "repo_public" -> if (isDe) "öffentlich" else "public"
-        "github_tutorial_title" -> if (isDe) "GitHub Token Tutorial" else "GitHub Token Tutorial"
-        "github_tutorial_step1" -> if (isDe) "1. Öffne diesen Link: https://github.com/settings/tokens" else "1. Open this link: https://github.com/settings/tokens"
-        "github_tutorial_step2" -> if (isDe) "2. Melde dich an (oder erstelle einen Account)." else "2. Log in (or create an account)."
-        "github_tutorial_step3" -> if (isDe) "3. Klicke auf \"Neuen Token generieren\" und wähle \"klassisch\" aus." else "3. Click on \"Generate new token\" and select \"classic\"."
-        "github_tutorial_step4" -> if (isDe) "4. Gib dem Token einen Namen." else "4. Give the token a name."
-        "github_tutorial_step5" -> if (isDe) "5. Klicke ALLE Scopes an." else "5. Select ALL scopes."
-        "github_tutorial_step6" -> if (isDe) "6. Bei \"Ablaufdatum\" wähle \"Kein Ablaufdatum\" aus." else "6. For \"Expiration\", select \"No expiration\"."
-        "github_tutorial_step7" -> if (isDe) "7. Klicke unten auf \"Token generieren\"." else "7. Click \"Generate token\" at the bottom."
-        "github_tutorial_step8" -> if (isDe) "8. Kopiere den Token und füge ihn hier in der App ein." else "8. Copy the token and paste it here in the app."
-        "codeberg_tutorial_title" -> if (isDe) "Codeberg Token Tutorial" else "Codeberg Token Tutorial"
-        "codeberg_tutorial_step1" -> if (isDe) "1. Öffne diesen Link: https://codeberg.org/user/settings/applications" else "1. Open this link: https://codeberg.org/user/settings/applications"
-        "codeberg_tutorial_step2" -> if (isDe) "2. Melde dich an (oder erstelle einen Account)." else "2. Log in (or create an account)."
-        "codeberg_tutorial_step3" -> if (isDe) "3. Klicke unter \"Zugriffstoken\" auf \"Neuer Zugangstoken\"." else "3. Under \"Access Tokens\", click \"New Access Token\"."
-        "codeberg_tutorial_step4" -> if (isDe) "4. Gib dem Token einen Namen." else "4. Give the token a name."
-        "codeberg_tutorial_step5" -> if (isDe) "5. Wähle bei \"Repository- und Organisationszugriff\" die Option \"Alle (öffentlich, privat, begrenzt)\" aus." else "5. For \"Repository and Organization Access\", select \"All (public, private, limited)\"."
-        "codeberg_tutorial_step6" -> if (isDe) "6. Wähle bei allen Berechtigungen \"Lesen und Schreiben\" aus." else "6. For all permissions, select \"Read and Write\"."
-        "codeberg_tutorial_step7" -> if (isDe) "7. Klicke auf \"Token generieren\"." else "7. Click \"Generate Token\"."
-        "codeberg_tutorial_step8" -> if (isDe) "8. Kopiere den Token und füge ihn hier in der App ein." else "8. Copy the token and paste it here in the app."
-        "version" -> "Version"
-        "updates" -> if (isDe) "Updates" else "Updates"
-        "update_available" -> if (isDe) "Update verfügbar" else "Update available"
-        "update_now" -> if (isDe) "Jetzt aktualisieren" else "Update now"
-        "current_version" -> if (isDe) "Aktuelle Version" else "Current version"
-        "new_version" -> if (isDe) "Neue Version" else "New version"
-        "download_complete" -> if (isDe) "Download abgeschlossen" else "Download complete"
-        "automatic_updates" -> if (isDe) "Nach Updates suchen" else "Check for updates"
-        "on" -> if (isDe) "An" else "On"
-        "off" -> if (isDe) "Aus" else "Off"
-        "later" -> if (isDe) "Vielleicht später" else "Maybe later"
-        "changelog_title" -> if (isDe) "Was ist neu?" else "What's new?"
-        "repo_stats" -> if (isDe) "Repository Statistiken" else "Repository Statistics"
-        "stars" -> if (isDe) "Sterne" else "Stars"
-        "forks" -> if (isDe) "Forks" else "Forks"
-        "watchers" -> if (isDe) "Beobachter" else "Watchers"
-        "created_at" -> if (isDe) "Erstellt am" else "Created at"
-        "total_downloads" -> if (isDe) "Gesamte Downloads" else "Total downloads"
-        "downloads_per_version" -> if (isDe) "Downloads pro Version" else "Downloads per version"
-        "pull_requests" -> if (isDe) "Pull Requests" else "Pull Requests"
-        "select_action" -> if (isDe) "Aktion auswählen" else "Select action"
-        "editor" -> if (isDe) "Editor" else "Editor"
-        "merge" -> if (isDe) "Mergen" else "Merge"
-        "merge_confirm" -> if (isDe) "Möchtest du diesen Pull Request wirklich mergen? Die Änderungen werden in den Code übernommen." else "Do you really want to merge this pull request? The changes will be applied to the code."
-        "yes_merge" -> if (isDe) "Ja, Mergen" else "Yes, merge"
-        "no_pull_requests" -> if (isDe) "Keine Pull Requests gefunden." else "No pull requests found."
-        "merged" -> if (isDe) "Gemerged" else "Merged"
-        "category_appearance" -> if (isDe) "Aussehen" else "Appearance"
-        "category_system" -> if (isDe) "System & Updates" else "System & Updates"
-        "auto_delete_apk" -> if (isDe) "APK Auto-Löschen" else "Auto-delete APK"
-        "searching_updates" -> if (isDe) "Suche nach Updates..." else "Checking for updates..."
-        "no_update_found" -> if (isDe) "Kein Update gefunden." else "No update found."
-        "update_available_msg" -> if (isDe) "Update verfügbar!" else "Update available!"
-        "update_button" -> if (isDe) "Jetzt Aktualisieren" else "Update Now"
-        "source_code" -> if (isDe) "Quellcode" else "Source Code"
-        "no_access" -> if (isDe) "Kein Zugriff auf die Datei." else "No access to this file."
-        "releases" -> if (isDe) "Releases" else "Releases"
-        "edit_release" -> if (isDe) "Release bearbeiten" else "Edit Release"
-        "assets" -> if (isDe) "Dateien" else "Assets"
-        "add_asset" -> if (isDe) "Datei hinzufügen" else "Add Asset"
-        "tag_name" -> if (isDe) "Tag Name" else "Tag Name"
-        "release_title" -> if (isDe) "Release Titel" else "Release Title"
-        "delete_release" -> if (isDe) "Release löschen" else "Delete Release"
-        "delete_release_confirm" -> if (isDe) "Möchtest du diesen Release wirklich löschen?" else "Do you really want to delete this release?"
-        "edit_changelog" -> if (isDe) "Beschreibung bearbeiten" else "Edit Description"
-        "select_tag" -> if (isDe) "Tag auswählen" else "Select Tag"
-        "accent_color" -> if (isDe) "Akzentfarbe" else "Accent Color"
-        "accent_blue" -> if (isDe) "Blau" else "Blue"
-        "accent_green" -> if (isDe) "Grün" else "Green"
-        "accent_red" -> if (isDe) "Rot" else "Red"
-        "accent_standard" -> if (isDe) "Standard" else "Standard"
-        "tab_apks" -> "APKs"
-        "tab_apps" -> "Apps"
-        "open_app" -> if (isDe) "Öffnen" else "Open"
-        "uninstall" -> if (isDe) "Deinstallieren" else "Uninstall"
-        "update_notice" -> if (isDe) "Update verfügbar!" else "Update available!"
-        "import_app_title" -> if (isDe) "App importieren" else "Import App"
-        "import_from_device" -> if (isDe) "Vom Handy importieren" else "Import from device"
-        "import_from_repo" -> if (isDe) "Vom Repository importieren" else "Import from repository"
-        "select_app_to_link" -> if (isDe) "App zum Verknüpfen wählen" else "Select app to link"
-        "link_with_repo" -> if (isDe) "Mit Repository verknüpfen" else "Link with repository"
-        "app_imported_success" -> if (isDe) "App erfolgreich importiert!" else "App imported successfully!"
-        "search_repos_to_link" -> if (isDe) "Nach Repository suchen..." else "Search for repository..."
-        "verifying" -> if (isDe) "Verifizierung läuft..." else "Verifying..."
-        "checking_version" -> if (isDe) "Prüfe Version: %s" else "Checking version: %s"
-        "version_mismatch" -> if (isDe) "Fehler: Keine Release für Version %s gefunden." else "Error: No release found for version %s."
-        "no_apk_found" -> if (isDe) "Keine APK in diesem Release gefunden." else "No APK found in this release."
-        "package_mismatch" -> if (isDe) "Paketname stimmt nicht überein!" else "Package name mismatch!"
-        "open_browser_title" -> if (isDe) "Link öffnen?" else "Open Link?"
-        "open_browser_message" -> if (isDe) "Dieser Link wird im Webbrowser geöffnet. Möchtest du fortfahren?" else "This link will open in your web browser. Do you want to proceed?"
-        "proceed" -> if (isDe) "Fortfahren" else "Proceed"
-        "system_app" -> if (isDe) "System" else "System"
-        "user_app" -> if (isDe) "Benutzer" else "User"
-        else -> key
+        "tab_search" -> R.string.tab_search
+        "tab_apk_manager" -> R.string.tab_apk_manager
+        "tab_account" -> R.string.tab_account
+        "tab_settings" -> R.string.tab_settings
+        "search_title" -> R.string.search_title
+        "search_hint" -> R.string.search_hint
+        "status_loading_repo" -> R.string.status_loading_repo
+        "status_no_apks" -> R.string.status_no_apks
+        "status_no_project" -> R.string.status_no_project
+        "status_searching" -> R.string.status_searching
+        "status_no_apps_found" -> R.string.status_no_apps_found
+        "status_error" -> R.string.status_error
+        "by" -> R.string.by
+        "followers" -> R.string.followers
+        "description" -> R.string.description
+        "no_releases" -> R.string.no_releases
+        "stable_release" -> R.string.stable_release
+        "pre_release" -> R.string.pre_release
+        "downloading" -> R.string.downloading
+        "download_apk" -> R.string.download_apk
+        "already_downloaded" -> R.string.already_downloaded
+        "select_version" -> R.string.select_version
+        "select_asset" -> R.string.select_asset
+        "stable_build" -> R.string.stable_build
+        "beta_experimental" -> R.string.beta_experimental
+        "apk_manager_title" -> R.string.apk_manager_title
+        "apk_manager_subtitle" -> R.string.apk_manager_subtitle
+        "no_apks_downloaded" -> R.string.no_apks_downloaded
+        "install" -> R.string.install
+        "repair" -> R.string.repair
+        "apk_corrupted" -> R.string.apk_corrupted
+        "repairing" -> R.string.repairing
+        "delete_apk" -> R.string.delete_apk
+        "issues" -> R.string.issues
+        "open" -> R.string.open
+        "closed" -> R.string.closed
+        "no_issues" -> R.string.no_issues
+        "new_issue" -> R.string.new_issue
+        "title" -> R.string.title
+        "body" -> R.string.body
+        "post" -> R.string.post
+        "comments" -> R.string.comments
+        "write_comment" -> R.string.write_comment
+        "settings_title" -> R.string.settings_title
+        "design" -> R.string.design
+        "language" -> R.string.language
+        "select_design" -> R.string.select_design
+        "select_language" -> R.string.select_language
+        "theme_system" -> R.string.theme_system
+        "theme_light" -> R.string.theme_light
+        "theme_dark" -> R.string.theme_dark
+        "profile_edit_title" -> R.string.profile_edit_title
+        "display_name" -> R.string.display_name
+        "bio" -> R.string.bio
+        "save" -> R.string.save
+        "cancel" -> R.string.cancel
+        "tap_to_edit" -> R.string.tap_to_edit
+        "change_token" -> R.string.change_token
+        "my_repositories" -> R.string.my_repositories
+        "my_repository_editor" -> R.string.my_repository_editor
+        "starred" -> R.string.starred
+        "login_title" -> R.string.login_title
+        "personal_access_token" -> R.string.personal_access_token
+        "search_apps_hint" -> R.string.search_apps_hint
+        "no_apps" -> R.string.no_apps
+        "delete" -> R.string.delete
+        "rename" -> R.string.rename
+        "rename_project_title" -> R.string.rename_project_title
+        "new_name" -> R.string.new_name
+        "new_github_project" -> R.string.new_github_project
+        "project_name" -> R.string.project_name
+        "private_repository" -> R.string.private_repository
+        "create" -> R.string.create
+        "delete_project_title" -> R.string.delete_project_title
+        "delete_project_confirm" -> R.string.delete_project_confirm
+        "delete_issue_title" -> R.string.delete_issue_title
+        "delete_issue_confirm" -> R.string.delete_issue_confirm
+        "delete_comment_title" -> R.string.delete_comment_title
+        "delete_comment_confirm" -> R.string.delete_comment_confirm
+        "yes_delete" -> R.string.yes_delete
+        "uploaded" -> R.string.uploaded
+        "upload_image" -> R.string.upload_image
+        "edit_via_app" -> R.string.edit_via_app
+        "upload_via_app" -> R.string.upload_via_app
+        "mb_loaded" -> R.string.mb_loaded
+        "stable_releases_header" -> R.string.stable_releases_header
+        "pre_releases_header" -> R.string.pre_releases_header
+        "changelog" -> R.string.changelog
+        "tutorial" -> R.string.tutorial
+        "repo_private" -> R.string.repo_private
+        "repo_public" -> R.string.repo_public
+        "github_tutorial_title" -> R.string.github_tutorial_title
+        "github_tutorial_step1" -> R.string.github_tutorial_step1
+        "github_tutorial_step2" -> R.string.github_tutorial_step2
+        "github_tutorial_step3" -> R.string.github_tutorial_step3
+        "github_tutorial_step4" -> R.string.github_tutorial_step4
+        "github_tutorial_step5" -> R.string.github_tutorial_step5
+        "github_tutorial_step6" -> R.string.github_tutorial_step6
+        "github_tutorial_step7" -> R.string.github_tutorial_step7
+        "github_tutorial_step8" -> R.string.github_tutorial_step8
+        "codeberg_tutorial_title" -> R.string.codeberg_tutorial_title
+        "codeberg_tutorial_step1" -> R.string.codeberg_tutorial_step1
+        "codeberg_tutorial_step2" -> R.string.codeberg_tutorial_step2
+        "codeberg_tutorial_step3" -> R.string.codeberg_tutorial_step3
+        "codeberg_tutorial_step4" -> R.string.codeberg_tutorial_step4
+        "codeberg_tutorial_step5" -> R.string.codeberg_tutorial_step5
+        "codeberg_tutorial_step6" -> R.string.codeberg_tutorial_step6
+        "codeberg_tutorial_step7" -> R.string.codeberg_tutorial_step7
+        "codeberg_tutorial_step8" -> R.string.codeberg_tutorial_step8
+        "version" -> R.string.version
+        "updates" -> R.string.updates
+        "update_available" -> R.string.update_available
+        "update_now" -> R.string.update_now
+        "current_version" -> R.string.current_version
+        "new_version" -> R.string.new_version
+        "download_complete" -> R.string.download_complete
+        "automatic_updates" -> R.string.automatic_updates
+        "on" -> R.string.on
+        "off" -> R.string.off
+        "later" -> R.string.later
+        "changelog_title" -> R.string.changelog_title
+        "repo_stats" -> R.string.repo_stats
+        "stars" -> R.string.stars
+        "forks" -> R.string.forks
+        "watchers" -> R.string.watchers
+        "created_at" -> R.string.created_at
+        "total_downloads" -> R.string.total_downloads
+        "downloads_per_version" -> R.string.downloads_per_version
+        "pull_requests" -> R.string.pull_requests
+        "select_action" -> R.string.select_action
+        "editor" -> R.string.editor
+        "merge" -> R.string.merge
+        "merge_confirm" -> R.string.merge_confirm
+        "yes_merge" -> R.string.yes_merge
+        "no_pull_requests" -> R.string.no_pull_requests
+        "merged" -> R.string.merged
+        "category_appearance" -> R.string.category_appearance
+        "category_system" -> R.string.category_system
+        "auto_delete_apk" -> R.string.auto_delete_apk
+        "searching_updates" -> R.string.searching_updates
+        "no_update_found" -> R.string.no_update_found
+        "update_available_msg" -> R.string.update_available_msg
+        "update_button" -> R.string.update_button
+        "source_code" -> R.string.source_code
+        "no_access" -> R.string.no_access
+        "releases" -> R.string.releases
+        "edit_release" -> R.string.edit_release
+        "assets" -> R.string.assets
+        "add_asset" -> R.string.add_asset
+        "tag_name" -> R.string.tag_name
+        "release_title" -> R.string.release_title
+        "delete_release" -> R.string.delete_release
+        "delete_release_confirm" -> R.string.delete_release_confirm
+        "edit_changelog" -> R.string.edit_changelog
+        "select_tag" -> R.string.select_tag
+        "accent_color" -> R.string.accent_color
+        "accent_blue" -> R.string.accent_blue
+        "accent_green" -> R.string.accent_green
+        "accent_red" -> R.string.accent_red
+        "accent_standard" -> R.string.accent_standard
+        "tab_apks" -> R.string.tab_apks
+        "tab_apps" -> R.string.tab_apps
+        "open_app" -> R.string.open_app
+        "uninstall" -> R.string.uninstall
+        "update_notice" -> R.string.update_notice
+        "import_app_title" -> R.string.import_app_title
+        "import_from_device" -> R.string.import_from_device
+        "import_from_repo" -> R.string.import_from_repo
+        "select_app_to_link" -> R.string.select_app_to_link
+        "link_with_repo" -> R.string.link_with_repo
+        "app_imported_success" -> R.string.app_imported_success
+        "search_repos_to_link" -> R.string.search_repos_to_link
+        "verifying" -> R.string.verifying
+        "checking_version" -> R.string.checking_version
+        "version_mismatch" -> R.string.version_mismatch
+        "no_apk_found" -> R.string.no_apk_found
+        "package_mismatch" -> R.string.package_mismatch
+        "open_browser_title" -> R.string.open_browser_title
+        "open_browser_message" -> R.string.open_browser_message
+        "proceed" -> R.string.proceed
+        "system_app" -> R.string.system_app
+        "user_app" -> R.string.user_app
+        "versions_available" -> R.string.versions_available
+        "close" -> R.string.close
+        "versions_count" -> R.string.versions_count
+        "create_new_release" -> R.string.create_new_release
+        "create_tag_prompt" -> R.string.create_tag_prompt
+        "staged_uploads" -> R.string.staged_uploads
+        "create_new_tag" -> R.string.create_new_tag
+        "enter_tag_name" -> R.string.enter_tag_name
+        "finishing" -> R.string.finishing
+        else -> 0
     }
+}
+
+private val localizedContextCache = java.util.concurrent.ConcurrentHashMap<String, Context>()
+
+private fun t(key: String, lang: String = ""): String {
+    val resId = getStringResId(key)
+    if (resId == 0) return key
+    val ctx = MainActivity.appContext ?: return key
+    if (lang == "de" || lang == "en" || lang == "zh") {
+        val localizedContext = localizedContextCache.getOrPut(lang) {
+            val config = Configuration(ctx.resources.configuration)
+            config.setLocale(Locale.forLanguageTag(lang))
+            ctx.createConfigurationContext(config)
+        }
+        return localizedContext.getString(resId)
+    }
+    return ctx.getString(resId)
 }
 
 private fun getFileName(context: Context, uri: android.net.Uri): String {
@@ -336,12 +366,18 @@ private fun getFileName(context: Context, uri: android.net.Uri): String {
 }
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        var appContext: Context? = null
+    }
+
     private val sharedText = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        appContext = applicationContext
         val sharedPrefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+
+        handleIntent(intent)
         setContent {
             val themeSetting = remember { mutableStateOf(sharedPrefs.getString("THEME_SETTING", "System") ?: "System") }
             val accentColorSetting = remember { mutableStateOf(sharedPrefs.getString("ACCENT_COLOR_SETTING", "Standard") ?: "Standard") }
@@ -374,6 +410,117 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Composable
+fun OneUiFloatingNavigationBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    languageSetting: String,
+    modifier: Modifier = Modifier
+) {
+    val items = remember(languageSetting) {
+        listOf(
+            Triple(0, t("tab_search", languageSetting), Icons.Default.Search),
+            Triple(1, t("tab_apk_manager", languageSetting), Icons.Default.Folder),
+            Triple(2, t("tab_account", languageSetting), Icons.Default.AccountCircle),
+            Triple(3, t("tab_settings", languageSetting), Icons.Default.Settings)
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        val isDark = MaterialTheme.colorScheme.surface.red < 0.5f
+        val navBgColor = if (isDark) Color(0xFF28282E).copy(alpha = 0.50f) else MaterialTheme.colorScheme.surfaceVariant
+        val navBorderColor = if (isDark) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+
+        Surface(
+            shape = RoundedCornerShape(30.dp),
+            color = navBgColor,
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = navBorderColor
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(62.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 6.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { (index, label, icon) ->
+                    val isSelected = selectedTab == index
+
+                    val pillBg = if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                    } else {
+                        Color.Transparent
+                    }
+
+                    val pillBorderColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    } else {
+                        Color.Transparent
+                    }
+
+                    val textColor = MaterialTheme.colorScheme.onSurface
+                    val iconColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(pillBg)
+                            .border(
+                                width = 1.dp,
+                                color = pillBorderColor,
+                                shape = RoundedCornerShape(22.dp)
+                            )
+                            .clickable {
+                                if (selectedTab != index) {
+                                    onTabSelected(index)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = iconColor,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableState<String>, accentColorSetting: MutableState<String>, sharedText: MutableState<String?>) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -392,7 +539,7 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
     var searchStatusMessage by remember { mutableStateOf("") }
     var skippedVersion by remember { mutableStateOf(sharedPrefs.getString("SKIPPED_VERSION", "") ?: "") }
     var showUpdateScreen by remember { mutableStateOf<AppRelease?>(null) }
-    
+
     val activeDownloads = remember { mutableStateMapOf<String, DownloadInfo>() }
 
     var selectedAppForDetail by remember { mutableStateOf<OpenSourceApp?>(null) }
@@ -482,24 +629,25 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
         }
     }
 
-    DisposableEffect(autoDeleteApk) {
-        if (!autoDeleteApk) return@DisposableEffect onDispose {}
+    DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == Intent.ACTION_PACKAGE_ADDED || intent.action == Intent.ACTION_PACKAGE_REPLACED) {
                     val packageName = intent.data?.schemeSpecificPart ?: return
-                    val mapping = sharedPrefs.getStringSet("APK_DELETE_MAPPING", emptySet()) ?: emptySet()
-                    val entry = mapping.find { it.startsWith("$packageName|") }
-                    if (entry != null) {
-                        val path = entry.substringAfter("|")
-                        val file = File(path)
-                        if (file.exists()) {
-                            file.delete()
-                            activeDownloads.remove(file.name)
-                            apkListRefreshTrigger++
+                    apkListRefreshTrigger++
+                    if (autoDeleteApk) {
+                        val mapping = sharedPrefs.getStringSet("APK_DELETE_MAPPING", emptySet()) ?: emptySet()
+                        val entry = mapping.find { it.startsWith("$packageName|") }
+                        if (entry != null) {
+                            val path = entry.substringAfter("|")
+                            val file = File(path)
+                            if (file.exists()) {
+                                file.delete()
+                                activeDownloads.remove(file.name)
+                            }
+                            val newMapping = mapping.toMutableSet().apply { remove(entry) }
+                            sharedPrefs.edit().putStringSet("APK_DELETE_MAPPING", newMapping).apply()
                         }
-                        val newMapping = mapping.toMutableSet().apply { remove(entry) }
-                        sharedPrefs.edit().putStringSet("APK_DELETE_MAPPING", newMapping).apply()
                     }
                 }
             }
@@ -622,12 +770,11 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
         }
         Scaffold(
             bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 }, label = { Text(t("tab_search", languageSetting)) }, icon = { Icon(Icons.Default.Search, null) })
-                    NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 }, label = { Text(t("tab_apk_manager", languageSetting)) }, icon = { Icon(Icons.Default.Folder, null) })
-                    NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2 }, label = { Text(t("tab_account", languageSetting)) }, icon = { Icon(Icons.Default.AccountCircle, null) })
-                    NavigationBarItem(selected = selectedTab == 3, onClick = { selectedTab = 3 }, label = { Text(t("tab_settings", languageSetting)) }, icon = { Icon(Icons.Default.Settings, null) })
-                }
+                OneUiFloatingNavigationBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    languageSetting = languageSetting
+                )
             }
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
@@ -655,7 +802,7 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
                         onPerformSearch = { performSearch(it) }
                     )
                     1 -> ApkManagerScreen(githubToken = githubToken, codebergToken = codebergToken, languageSetting = languageSetting, activeDownloads = activeDownloads, globalScope = scope, refreshTrigger = apkListRefreshTrigger)
-                    2 -> AccountMultiScreen(githubToken = githubToken, codebergToken = codebergToken, onGithubTokenSaved = { t -> 
+                    2 -> AccountMultiScreen(githubToken = githubToken, codebergToken = codebergToken, onGithubTokenSaved = { t ->
                         githubToken = t
                         sharedPrefs.edit().putString("GITHUB_TOKEN", t).apply()
                     }, onCodebergTokenSaved = { t -> codebergToken = t; sharedPrefs.edit().putString("CODEBERG_TOKEN", t).apply() }, onUsernameClick = { login, platform -> fullRepoListPlatform = platform; fullRepoListAppsOnly = false; fullRepoListAvatarUrl = ""; isViewingOwnProfile = true; showFullRepoListForUser = login }, languageSetting = languageSetting, onAppSelected = { selectedAppForDetail = it })
@@ -663,15 +810,18 @@ fun OpenSourceStoreApp(sharedPrefs: SharedPreferences, themeSetting: MutableStat
                         currentTheme = themeSetting.value,
                         onThemeChange = { themeSetting.value = it; sharedPrefs.edit().putString("THEME_SETTING", it).apply() },
                         currentAccentColor = accentColorSetting.value,
-                        onAccentColorChange = { accentColorSetting.value = it; sharedPrefs.edit().putString("ACCENT_COLOR_SETTING", it).apply() },
-                        currentLanguage = languageSetting,
-                        onLanguageChange = { languageSetting = it; sharedPrefs.edit().putString("LANGUAGE_SETTING", it).apply() },
-                        updatesEnabled = updatesEnabled,
-                        onUpdatesEnabledChange = { updatesEnabled = it; sharedPrefs.edit().putBoolean("UPDATES_ENABLED", it).apply() },
-                        autoDeleteApk = autoDeleteApk,
-                        onAutoDeleteApkChange = { autoDeleteApk = it; sharedPrefs.edit().putBoolean("AUTO_DELETE_APK", it).apply() },
-                        languageSetting = languageSetting
-                    )
+                            onAccentColorChange = { accentColorSetting.value = it; sharedPrefs.edit().putString("ACCENT_COLOR_SETTING", it).apply() },
+                            currentLanguage = languageSetting,
+                            onLanguageChange = { newLang ->
+                                languageSetting = newLang
+                                sharedPrefs.edit().putString("LANGUAGE_SETTING", newLang).apply()
+                            },
+                            updatesEnabled = updatesEnabled,
+                            onUpdatesEnabledChange = { updatesEnabled = it; sharedPrefs.edit().putBoolean("UPDATES_ENABLED", it).apply() },
+                            autoDeleteApk = autoDeleteApk,
+                            onAutoDeleteApkChange = { autoDeleteApk = it; sharedPrefs.edit().putBoolean("AUTO_DELETE_APK", it).apply() },
+                            languageSetting = languageSetting
+                        )
                 }
             }
         }
@@ -790,9 +940,11 @@ fun SettingsScreen(
                     Spacer(Modifier.width(12.dp))
                     Text(t("language", languageSetting), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
-                val langLabel = when(currentLanguage) {
-                    "de" -> "Deutsch"
-                    "en" -> "English"
+                val langLabel = when {
+                    currentLanguage == "de" -> "Deutsch"
+                    currentLanguage == "en" -> "English"
+                    currentLanguage == "zh" -> "中文"
+                    currentLanguage.equals("system", ignoreCase = true) -> t("theme_system", languageSetting)
                     else -> currentLanguage
                 }
                 Text(langLabel, color = MaterialTheme.colorScheme.primary)
@@ -917,12 +1069,18 @@ fun SettingsScreen(
             title = { Text(t("select_language", languageSetting)) },
             text = {
                 Column {
-                    listOf("Deutsch" to "de", "English" to "en").forEach { (label, code) ->
+                    listOf(
+                        t("theme_system", languageSetting) to "system",
+                        "Deutsch" to "de",
+                        "English" to "en",
+                        "中文" to "zh"
+                    ).forEach { (label, code) ->
+                        val isSelected = currentLanguage == code || (code == "system" && currentLanguage.equals("system", ignoreCase = true))
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { onLanguageChange(code); showLanguageDialog = false }.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RadioButton(selected = currentLanguage == code, onClick = { onLanguageChange(code); showLanguageDialog = false })
+                            RadioButton(selected = isSelected, onClick = { onLanguageChange(code); showLanguageDialog = false })
                             Spacer(Modifier.width(12.dp))
                             Text(label)
                         }
@@ -1189,6 +1347,7 @@ fun AppCard(app: OpenSourceApp, onClick: () -> Unit) {
 fun ImageZoomScreen(imageUrl: String, onDismiss: () -> Unit) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var showControls by remember { mutableStateOf(true) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1210,8 +1369,22 @@ fun ImageZoomScreen(imageUrl: String, onDismiss: () -> Unit) {
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { showControls = !showControls }
+                        )
+                    }
+                    .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
+                            val prevScale = scale
                             scale = (scale * zoom).coerceIn(1f, 5f)
+
+                            if (zoom != 1f && scale > 1.05f) {
+                                showControls = false
+                            }
+                            if (scale <= 1.01f && prevScale > 1.01f) {
+                                showControls = true
+                            }
+
                             if (scale > 1f) {
                                 val maxX = (maxWidthPx * (scale - 1)) / 2
                                 val maxY = (maxHeightPx * (scale - 1)) / 2
@@ -1232,13 +1405,19 @@ fun ImageZoomScreen(imageUrl: String, onDismiss: () -> Unit) {
                     ),
                 contentScale = ContentScale.Fit
             )
-            IconButton(
-                onClick = onDismiss,
+            AnimatedVisibility(
+                visible = showControls,
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(200)),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                IconButton(
+                    onClick = onDismiss
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                }
             }
         }
     }
@@ -1311,7 +1490,7 @@ fun AppDetailFullScreen(
         if(expectedFileName.isNotEmpty()) isDownloadedLocal = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), expectedFileName).exists()
     }
 
-    BackHandler { 
+    BackHandler {
         if (showVersionSheet) showVersionSheet = false
         else if (showAssetSheet) showAssetSheet = false
         else onBack()
@@ -1393,16 +1572,16 @@ fun AppDetailFullScreen(
                             if (releases.isNullOrEmpty() || selectedRelease == null) Text(t("no_releases", languageSetting), color = Color.Red, modifier = Modifier.padding(16.dp))
                         else {
                             val currentAssets = releases!!.filter { it.version == selectedRelease!!.version }
-                            
+
                             OutlinedButton(onClick = { showVersionSheet = true }, modifier = Modifier.fillMaxWidth().wrapContentHeight(), contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp)) { Text("${selectedRelease!!.version} (${if(selectedRelease!!.isPreRelease) t("pre_release", languageSetting) else t("stable_release", languageSetting)})", fontSize = 16.sp, textAlign = TextAlign.Center) }
-                            
+
                             if (currentAssets.size > 1) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                OutlinedButton(onClick = { showAssetSheet = true }, modifier = Modifier.fillMaxWidth().wrapContentHeight(), contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp)) { 
-                                    Text(selectedRelease!!.assetName, fontSize = 16.sp, textAlign = TextAlign.Center) 
+                                OutlinedButton(onClick = { showAssetSheet = true }, modifier = Modifier.fillMaxWidth().wrapContentHeight(), contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp)) {
+                                    Text(selectedRelease!!.assetName, fontSize = 16.sp, textAlign = TextAlign.Center)
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.height(8.dp))
 
                             if (downloadState.isDownloading) {
@@ -1545,7 +1724,6 @@ fun CustomMenuOverlay(
 
     if (visibleState.targetState || visibleState.currentState || scrimAlpha > 0f) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Scrim
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1557,7 +1735,6 @@ fun CustomMenuOverlay(
                     )
             )
 
-            // Sheet
             AnimatedVisibility(
                 visibleState = visibleState,
                 enter = slideInVertically(
@@ -1658,17 +1835,22 @@ fun VersionItem(release: AppRelease, isSelected: Boolean, onClick: () -> Unit) {
 @Composable
 fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting: String, activeDownloads: MutableMap<String, DownloadInfo>, globalScope: CoroutineScope, refreshTrigger: Int) {
     val context = LocalContext.current
-    var selectedSubTab by rememberSaveable { mutableIntStateOf(0) } 
-    val expandedRepoKeys = remember { mutableStateMapOf<String, Boolean>() } 
-    
-    var downloadedFiles by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
+    var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
+    val expandedRepoKeys = remember { mutableStateMapOf<String, Boolean>() }
+
+    val initialFiles = remember {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        dir?.listFiles { _, name -> name.endsWith(".apk") && name != "update.apk" }?.toList() ?: emptyList()
+    }
+    var downloadedFiles by remember { mutableStateOf<List<java.io.File>>(initialFiles) }
     var installedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
     val appUpdatesMap = remember { mutableStateMapOf<String, Boolean>() }
-    var isDataReady by remember { mutableStateOf(false) }
-    
+    var hasLoadedFiles by remember { mutableStateOf(initialFiles.isNotEmpty()) }
+    var hasLoadedApps by remember { mutableStateOf(false) }
+
     var selectedFileForDialog by remember { mutableStateOf<java.io.File?>(null) }
     var selectedAppForDialog by remember { mutableStateOf<InstalledApp?>(null) }
-    
+
     var isRepairingLocal by remember { mutableStateOf(false) }
     var repairProgressLocal by remember { mutableStateOf("") }
     var currentFileValid by remember { mutableStateOf(true) }
@@ -1676,21 +1858,24 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
     var showAppUpdatePanel by remember { mutableStateOf<InstalledApp?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
 
-    suspend fun refreshFiles() = withContext(Dispatchers.IO) { 
+    suspend fun refreshFiles() = withContext(Dispatchers.IO) {
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         val files = dir?.listFiles { _, name -> name.endsWith(".apk") && name != "update.apk" }?.toList() ?: emptyList()
-        withContext(Dispatchers.Main) { downloadedFiles = files }
+        withContext(Dispatchers.Main) {
+            downloadedFiles = files
+            hasLoadedFiles = true
+        }
     }
-    
+
     suspend fun refreshInstalledApps() = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
         val mapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet()) ?: emptySet()
         val appList = mutableListOf<InstalledApp>()
-        
+
         mapping.forEach { entry ->
             val parts = entry.split("|")
-            if (parts.size == 4) {
+            if (parts.size in 4..5) {
                 val pkg = parts[0]
                 val platform = parts[1]
                 val owner = parts[2]
@@ -1702,20 +1887,22 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                     val icon = info.applicationInfo?.loadIcon(pm)
                     appList.add(InstalledApp(pkg, label, version, icon, platform, owner, appName))
                 } catch (e: Exception) {
-                    // Even if not currently installed, we might want to show it if we have the meta, 
+                    // Even if not currently installed, we might want to show it if we have the meta,
                     // but the requirement says "checks if app is really installed"
                 }
             }
         }
-        withContext(Dispatchers.Main) { installedApps = appList.sortedBy { it.label } }
+        withContext(Dispatchers.Main) {
+            installedApps = appList.sortedBy { it.label }
+            hasLoadedApps = true
+        }
     }
-    
-    LaunchedEffect(refreshTrigger) { 
+
+    LaunchedEffect(refreshTrigger) {
         coroutineScope {
             launch { refreshFiles() }
             launch { refreshInstalledApps() }
         }
-        isDataReady = true
     }
 
     if (selectedFileForDialog != null) {
@@ -1735,8 +1922,20 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                 currentFileValid = isApkValid(context, file)
             }
         }
-        val avatarUrl = when (platform) { "GitHub" -> "https://github.com/$owner.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
-        val apkIcon = remember(file) { getApkIcon(context, file) }
+        val avatarUrl = remember(fileName) {
+            val p = fileName.removeSuffix(".apk").split("_")
+            when (p.getOrNull(0)) {
+                "GitHub" -> if (p.getOrNull(1)?.isNotBlank() == true) "https://github.com/${p[1]}.png" else null
+                "Codeberg" -> "https://codeberg.org/assets/img/logo.png"
+                else -> null
+            }
+        }
+        val initialDialogIcon = remember(file.name, file.lastModified()) { getFastCachedApkIcon(context, file) }
+        val apkIcon by produceState<Drawable?>(initialValue = initialDialogIcon, key1 = file, key2 = isDownloadingGlobal, key3 = isRepairingLocal) {
+            if (!isDownloadingGlobal && !isRepairingLocal && file.exists()) {
+                value = withContext(Dispatchers.IO) { getApkIcon(context, file) }
+            }
+        }
         val apkIconPainter = rememberAsyncImagePainter(apkIcon)
 
         AlertDialog(onDismissRequest = { if (!isRepairingLocal) selectedFileForDialog = null }, confirmButton = {}, title = null, text = {
@@ -1749,7 +1948,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                     Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
                 }
                 Spacer(modifier = Modifier.height(16.dp)); Text(appName.ifBlank { file.name }, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
-                if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showUpdatePanel = file }) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                if (version.isNotBlank()) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showUpdatePanel = file; selectedFileForDialog = null }) { Text("${t("version", languageSetting)} $version", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 
                 if (!currentFileValid && !isDownloadingGlobal && file.exists()) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
@@ -1810,7 +2009,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                 ) {
                     Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
                 }
-                
+
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val appIconPainter = rememberAsyncImagePainter(app.icon)
                     if (app.icon != null) {
@@ -1819,30 +2018,30 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                         Icon(Icons.Default.Android, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
                     }
                     Spacer(modifier = Modifier.height(16.dp)); Text(app.label, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = TextAlign.Center)
-                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showAppUpdatePanel = app }) { 
-                        Text("${t("version", languageSetting)} ${app.version}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold) 
+                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.padding(top = 4.dp).clickable { showAppUpdatePanel = app; selectedAppForDialog = null }) {
+                        Text("${t("version", languageSetting)} ${app.version}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
-                    
+
                     Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Button(onClick = { 
+
+                    Button(onClick = {
                         val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
                         if (intent != null) context.startActivity(intent)
-                        selectedAppForDialog = null 
-                    }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { 
-                        Icon(Icons.Default.Launch, null); Spacer(modifier = Modifier.width(10.dp)); Text(t("open_app", languageSetting), fontWeight = FontWeight.Bold) 
+                        selectedAppForDialog = null
+                    }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) {
+                        Icon(Icons.Default.Launch, null); Spacer(modifier = Modifier.width(10.dp)); Text(t("open_app", languageSetting), fontWeight = FontWeight.Bold)
                     }
-                    
-                    Spacer(modifier = Modifier.height(12.dp)); 
-                    TextButton(onClick = { 
+
+                    Spacer(modifier = Modifier.height(12.dp));
+                    TextButton(onClick = {
                         val intent = Intent(Intent.ACTION_DELETE).apply {
                             data = android.net.Uri.parse("package:${app.packageName}")
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         }
                         context.startActivity(intent)
-                        selectedAppForDialog = null 
-                    }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF5350))) { 
-                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("uninstall", languageSetting), fontWeight = FontWeight.Medium) 
+                        selectedAppForDialog = null
+                    }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF5350))) {
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(t("uninstall", languageSetting), fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -1856,7 +2055,7 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                     Text(t("apk_manager_title", languageSetting), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Text(t("apk_manager_subtitle", languageSetting), fontSize = 12.sp, color = Color.Gray)
                 }
-                
+
                 Row(
                     modifier = Modifier
                         .width(160.dp)
@@ -1886,15 +2085,10 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                     }
                 }
             }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (!isDataReady) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        } else {
-            androidx.compose.animation.Crossfade(targetState = selectedSubTab, animationSpec = tween(durationMillis = 250), modifier = Modifier.fillMaxSize()) { tab ->
+        androidx.compose.animation.Crossfade(targetState = selectedSubTab, animationSpec = tween(durationMillis = 250), modifier = Modifier.fillMaxSize()) { tab ->
                 if (tab == 0) {
                     val displayList = remember(downloadedFiles, activeDownloads.size) {
                         val list = downloadedFiles.toMutableList()
@@ -1934,8 +2128,10 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                     }
 
                     if (groupedList.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(t("no_apks_downloaded", languageSetting))
+                        if (hasLoadedFiles) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(t("no_apks_downloaded", languageSetting))
+                            }
                         }
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
@@ -1948,12 +2144,22 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                     val fileName = newestFile.name
                                     val parts = fileName.removeSuffix(".apk").split("_")
                                     val isDownloading = activeDownloads[fileName]?.isDownloading == true
-                                    val isValid by produceState(initialValue = true, key1 = newestFile) {
+                                    val avatarUrl = remember(newestFile.name) {
+                                        when (parts.getOrNull(0)) {
+                                            "GitHub" -> if (parts.getOrNull(1)?.isNotBlank() == true) "https://github.com/${parts[1]}.png" else null
+                                            "Codeberg" -> "https://codeberg.org/assets/img/logo.png"
+                                            else -> null
+                                        }
+                                    }
+                                    val isValid by produceState(initialValue = true, key1 = newestFile, key2 = isDownloading) {
                                         if (!isDownloading) value = withContext(Dispatchers.IO) { isApkValid(context, newestFile) }
                                     }
-                                    val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
-                                    val apkIcon by produceState<Drawable?>(initialValue = null, key1 = newestFile) {
-                                        if (isValid && !isDownloading && newestFile.exists()) value = withContext(Dispatchers.IO) { getApkIcon(context, newestFile) }
+                                    val initialIcon = remember(newestFile.name, newestFile.lastModified()) { getFastCachedApkIcon(context, newestFile) }
+                                    val apkIcon by produceState<Drawable?>(initialValue = initialIcon, key1 = newestFile, key2 = isDownloading) {
+                                        if (isValid && !isDownloading && newestFile.exists()) {
+                                            val full = withContext(Dispatchers.IO) { getFullApkIcon(context, newestFile) }
+                                            if (full != null && full != value) value = full
+                                        }
                                     }
                                     val fileLengthMb = remember(newestFile.name, newestFile.lastModified()) { newestFile.length() / (1024 * 1024) }
 
@@ -1965,12 +2171,21 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                             modifier = Modifier.fillMaxWidth().padding(12.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            val apkIconPainter = rememberAsyncImagePainter(apkIcon)
                                             Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
                                                 if (apkIcon != null) {
-                                                    AsyncImage(model = apkIcon, placeholder = apkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                    androidx.compose.foundation.Image(
+                                                        painter = rememberAsyncImagePainter(apkIcon),
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
                                                 } else if (avatarUrl != null) {
-                                                    AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                    AsyncImage(
+                                                        model = avatarUrl,
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
                                                 } else {
                                                     Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
                                                 }
@@ -1998,12 +2213,25 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                             val fileName = newestFile.name
                                             val parts = fileName.removeSuffix(".apk").split("_")
                                             val isDownloading = activeDownloads[fileName]?.isDownloading == true
-                                            val isValid by produceState(initialValue = true, key1 = newestFile) {
+                                            val avatarUrl = remember(newestFile.name) {
+                                                when (parts.getOrNull(0)) {
+                                                    "GitHub" -> if (parts.getOrNull(1)?.isNotBlank() == true) "https://github.com/${parts[1]}.png" else null
+                                                    "Codeberg" -> "https://codeberg.org/assets/img/logo.png"
+                                                    else -> null
+                                                }
+                                            }
+                                            val isValid by produceState(initialValue = true, key1 = newestFile, key2 = isDownloading) {
                                                 if (!isDownloading) value = withContext(Dispatchers.IO) { isApkValid(context, newestFile) }
                                             }
-                                            val avatarUrl = when (parts.getOrNull(0)) { "GitHub" -> "https://github.com/${parts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
-                                            val apkIcon by produceState<Drawable?>(initialValue = null, key1 = newestFile) {
-                                                if (isValid && !isDownloading && newestFile.exists()) value = withContext(Dispatchers.IO) { getApkIcon(context, newestFile) }
+                                            val initialIcon = remember(newestFile.name, newestFile.lastModified()) { getFastCachedApkIcon(context, newestFile) }
+                                            val apkIcon by produceState<Drawable?>(initialValue = initialIcon, key1 = newestFile, key2 = isDownloading) {
+                                                if (isValid && !isDownloading && newestFile.exists()) {
+                                                    val full = withContext(Dispatchers.IO) { getFullApkIcon(context, newestFile) }
+                                                    if (full != null && full != value) value = full
+                                                }
+                                            }
+                                            val groupIcon = apkIcon ?: remember(group.files, apkIcon) {
+                                                group.files.firstNotNullOfOrNull { getFastCachedApkIcon(context, it) }
                                             }
 
                                             Row(
@@ -2013,12 +2241,21 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                                     .padding(12.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                val apkIconPainter = rememberAsyncImagePainter(apkIcon)
                                                 Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
-                                                    if (apkIcon != null) {
-                                                        AsyncImage(model = apkIcon, placeholder = apkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                    if (groupIcon != null) {
+                                                        androidx.compose.foundation.Image(
+                                                            painter = rememberAsyncImagePainter(groupIcon),
+                                                            contentDescription = null,
+                                                            contentScale = ContentScale.Crop,
+                                                            modifier = Modifier.fillMaxSize()
+                                                        )
                                                     } else if (avatarUrl != null) {
-                                                        AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                        AsyncImage(
+                                                            model = avatarUrl,
+                                                            contentDescription = null,
+                                                            contentScale = ContentScale.Crop,
+                                                            modifier = Modifier.fillMaxSize()
+                                                        )
                                                     } else {
                                                         Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
                                                     }
@@ -2030,13 +2267,14 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                                         if (!isValid) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
                                                         if (isDownloading) { Spacer(Modifier.width(8.dp)); CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, strokeCap = StrokeCap.Round, trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) }
                                                     }
+                                                    val totalGroupMb = remember(group.files) { group.files.sumOf { it.length() } / (1024 * 1024) }
                                                     Text(
                                                         if (isExpanded) {
-                                                            "$versionCount ${if (languageSetting == "de") "Versionen verfügbar" else "versions available"}"
+                                                            "$versionCount ${t("versions_available", languageSetting)}"
                                                         } else if (isDownloading) {
                                                             activeDownloads[fileName]?.progress ?: ""
                                                         } else {
-                                                            "${newestFile.length() / (1024 * 1024)} MB"
+                                                            "$totalGroupMb MB"
                                                         },
                                                         fontSize = 12.sp,
                                                         color = Color.Gray
@@ -2052,9 +2290,9 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                                     ) {
                                                         Text(
                                                             if (isExpanded) {
-                                                                if (languageSetting == "de") "Schließen" else "Close"
+                                                                t("close", languageSetting)
                                                             } else {
-                                                                "$versionCount ${if (languageSetting == "de") "Versionen" else "Versions"}"
+                                                                "$versionCount ${t("versions_count", languageSetting)}"
                                                             },
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.Bold,
@@ -2083,12 +2321,22 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                                         val itemFileName = file.name
                                                         val itemParts = itemFileName.removeSuffix(".apk").split("_")
                                                         val isItemDownloading = activeDownloads[itemFileName]?.isDownloading == true
-                                                        val isItemValid by produceState(initialValue = true, key1 = file) {
+                                                        val itemAvatarUrl = remember(file.name) {
+                                                            when (itemParts.getOrNull(0)) {
+                                                                "GitHub" -> if (itemParts.getOrNull(1)?.isNotBlank() == true) "https://github.com/${itemParts[1]}.png" else null
+                                                                "Codeberg" -> "https://codeberg.org/assets/img/logo.png"
+                                                                else -> null
+                                                            }
+                                                        }
+                                                        val isItemValid by produceState(initialValue = true, key1 = file, key2 = isItemDownloading) {
                                                             if (!isItemDownloading) value = withContext(Dispatchers.IO) { isApkValid(context, file) }
                                                         }
-                                                        val itemAvatarUrl = when (itemParts.getOrNull(0)) { "GitHub" -> "https://github.com/${itemParts.getOrNull(1)}.png"; "Codeberg" -> "https://codeberg.org/assets/img/logo.png"; else -> null }
-                                                        val itemApkIcon by produceState<Drawable?>(initialValue = null, key1 = file) {
-                                                            if (isItemValid && !isItemDownloading && file.exists()) value = withContext(Dispatchers.IO) { getApkIcon(context, file) }
+                                                        val itemInitialIcon = remember(file.name, file.lastModified()) { getFastCachedApkIcon(context, file) }
+                                                        val itemApkIcon by produceState<Drawable?>(initialValue = itemInitialIcon, key1 = file, key2 = isItemDownloading) {
+                                                            if (isItemValid && !isItemDownloading && file.exists()) {
+                                                                val full = withContext(Dispatchers.IO) { getFullApkIcon(context, file) }
+                                                                if (full != null && full != value) value = full
+                                                            }
                                                         }
                                                         val rawVer = itemParts.getOrNull(3) ?: ""
                                                         val displayVer = if (rawVer.isNotBlank()) "v${rawVer.removePrefix("v")}" else file.name
@@ -2100,12 +2348,21 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                                                             verticalAlignment = Alignment.CenterVertically
                                                         ) {
-                                                            val itemApkIconPainter = rememberAsyncImagePainter(itemApkIcon)
                                                             Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))) {
                                                                 if (itemApkIcon != null) {
-                                                                    AsyncImage(model = itemApkIcon, placeholder = itemApkIconPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                                    androidx.compose.foundation.Image(
+                                                                        painter = rememberAsyncImagePainter(itemApkIcon),
+                                                                        contentDescription = null,
+                                                                        contentScale = ContentScale.Crop,
+                                                                        modifier = Modifier.fillMaxSize()
+                                                                    )
                                                                 } else if (itemAvatarUrl != null) {
-                                                                    AsyncImage(model = itemAvatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                                    AsyncImage(
+                                                                        model = itemAvatarUrl,
+                                                                        contentDescription = null,
+                                                                        contentScale = ContentScale.Crop,
+                                                                        modifier = Modifier.fillMaxSize()
+                                                                    )
                                                                 } else {
                                                                     Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
                                                                 }
@@ -2141,9 +2398,12 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                         }
                     }
                 } else {
-                    if (installedApps.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apps", languageSetting)) }
-                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) { items(installedApps, key = { it.packageName }) { app ->
-                        Card(modifier = Modifier.fillMaxWidth().clickable { selectedAppForDialog = app }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { 
+                    if (installedApps.isEmpty()) {
+                        if (hasLoadedApps) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(t("no_apps", languageSetting)) }
+                        }
+                    } else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) { items(installedApps, key = { it.packageName }) { app ->
+                        Card(modifier = Modifier.fillMaxWidth().clickable { selectedAppForDialog = app }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                             Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))) {
                                     if (app.icon != null) {
@@ -2152,12 +2412,12 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                         Icon(Icons.Default.Android, null, modifier = Modifier.fillMaxSize(), tint = Color.Gray)
                                     }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp)); 
+                                Spacer(modifier = Modifier.width(12.dp));
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(app.label, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text("${t("version", languageSetting)} ${app.version}", fontSize = 12.sp, color = Color.Gray)
                                 }
-                                
+
                                 val hasUpdate = appUpdatesMap[app.packageName] ?: false
                                 LaunchedEffect(app.packageName) {
                                     if (app.packageName !in appUpdatesMap) {
@@ -2182,26 +2442,25 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
                                         }
                                     }
                                 }
-                                
+
                                 if (hasUpdate) {
                                     Surface(
                                         onClick = { showAppUpdatePanel = app },
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                         shape = CircleShape,
                                         modifier = Modifier.padding(end = 12.dp)
                                     ) {
                                         Text(t("update_notice", languageSetting), modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
-                                
+
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
-                            } 
+                            }
                         }
                     } }
                 }
             }
         }
-    }
 
     if (selectedSubTab == 1) {
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -2237,14 +2496,15 @@ fun ApkManagerScreen(githubToken: String, codebergToken: String, languageSetting
         val owner = parts.getOrNull(1) ?: ""
         val appName = parts.getOrNull(2) ?: ""
         val version = parts.getOrNull(3) ?: ""
-        
-        AppUpdatePanelDialog(platform, owner, appName, version, githubToken, codebergToken, languageSetting, context, fileName, file, activeDownloads, globalScope, onRefresh = { globalScope.launch { refreshFiles() } }, onDismiss = { showUpdatePanel = null }, onOpenApkDetail = { selectedFileForDialog = it }, onDownloadStarted = { selectedSubTab = 0 })
+
+        AppUpdatePanelDialog(platform, owner, appName, version, githubToken, codebergToken, languageSetting, context, fileName, file, activeDownloads, globalScope, onRefresh = { globalScope.launch { refreshFiles(); refreshInstalledApps() } }, onDismiss = { showUpdatePanel = null }, onOpenApkDetail = { selectedFileForDialog = it }, onDownloadStarted = { selectedSubTab = 0 })
     }
-    
+
     if (showAppUpdatePanel != null) {
         val app = showAppUpdatePanel!!
-        val fileName = "${app.platform}_${app.owner}_${app.appName}_${app.version}.apk"
-        AppUpdatePanelDialog(app.platform, app.owner, app.appName, app.version, githubToken, codebergToken, languageSetting, context, fileName, null, activeDownloads, globalScope, onRefresh = { globalScope.launch { refreshInstalledApps() } }, onDismiss = { showAppUpdatePanel = null }, onOpenApkDetail = { selectedFileForDialog = it; selectedSubTab = 0 }, onDownloadStarted = { selectedSubTab = 0 })
+        val appVersion = try { context.packageManager.getPackageInfo(app.packageName, 0).versionName ?: app.version } catch (e: Exception) { app.version }
+        val fileName = "${app.platform}_${app.owner}_${app.appName}_${appVersion}.apk"
+        AppUpdatePanelDialog(app.platform, app.owner, app.appName, appVersion, githubToken, codebergToken, languageSetting, context, fileName, null, activeDownloads, globalScope, onRefresh = { globalScope.launch { refreshFiles(); refreshInstalledApps() } }, onDismiss = { showAppUpdatePanel = null }, onOpenApkDetail = { selectedFileForDialog = it; selectedSubTab = 0 }, onDownloadStarted = { selectedSubTab = 0 })
     }
 }
 
@@ -2266,10 +2526,10 @@ fun AppUpdatePanelDialog(
         val rels = if (platform == "GitHub") fetchGitHubReleases(owner, appName, githubToken)
         else if (platform == "Codeberg") fetchCodebergReleases(owner, appName, codebergToken)
         else emptyList()
-        
+
         val currentRelease = rels.find { it.version.trim().removePrefix("v") == version.trim().removePrefix("v") }
         val currentIsPre = (currentRelease?.isPreRelease == true) || version.contains("-")
-        
+
         latestRelease = if (currentIsPre) {
             rels.firstOrNull()
         } else {
@@ -2299,15 +2559,15 @@ fun AppUpdatePanelDialog(
                 } else if (latestRelease != null) {
                     val lr = latestRelease!!
                     val isNewer = isNewerVersion(version, lr.version)
-                    
+
                     Column(modifier = Modifier.padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(if(isNewer) Icons.Default.NewReleases else Icons.Default.CheckCircle, null, modifier = Modifier.size(72.dp), tint = if(isNewer) MaterialTheme.colorScheme.primary else Color(0xFF4CAF50))
                         Spacer(Modifier.height(16.dp))
                         Text(if (isNewer) t("update_available_msg", languageSetting) else t("no_update_found", languageSetting), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
                     }
-                    
+
                     Spacer(Modifier.height(32.dp))
-                    
+
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
                             Text(t("current_version", languageSetting), fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
@@ -2334,7 +2594,7 @@ fun AppUpdatePanelDialog(
                         val newFileName = "${platform}_${owner}_${appName}_${lr.version}.apk"
                         val targetFile = java.io.File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), newFileName)
                         val isDownloaded = targetFile.exists() && isApkValid(context, targetFile)
-                        
+
                         Spacer(Modifier.height(24.dp))
                         Button(
                             onClick = {
@@ -2351,8 +2611,8 @@ fun AppUpdatePanelDialog(
                                         }
                                         if (newFile != null) {
                                             withContext(Dispatchers.Main) {
+                                                activeDownloads[newFileName] = DownloadInfo(isDownloaded = true, isDownloading = false)
                                                 onRefresh()
-                                                activeDownloads.remove(newFileName)
                                             }
                                         } else {
                                             activeDownloads.remove(newFileName)
@@ -2379,6 +2639,8 @@ fun AppUpdatePanelDialog(
         }
     }
 }
+
+
 
 
 @Composable
@@ -2457,7 +2719,7 @@ fun UserProfileHeaderCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "${userProfile?.followers ?: 0} ${if (languageSetting == "de") "Follower" else "Followers"}",
+                            text = "${userProfile?.followers ?: 0} ${t("followers", languageSetting)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2506,7 +2768,7 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
     LaunchedEffect(Unit) { refresh() }
     var showActionChoice by remember { mutableStateOf<SimpleRepo?>(null) }
     var currentlySwipedRepoByUrl by remember { mutableStateOf<String?>(null) }
-    
+
     Scaffold(
         topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, t("cancel", languageSetting)) } }, actions = { IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, null) } }) },
         floatingActionButton = { if (isOwnProfile && platform == "GitHub") FloatingActionButton(onClick = { showCreateDialog = true }) { Icon(Icons.Default.Add, null) } }
@@ -2650,7 +2912,7 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
         if (showCreateDialog) AlertDialog(onDismissRequest = { showCreateDialog = false }, title = { Text(t("new_github_project", languageSetting)) }, text = { Column { OutlinedTextField(value = newRepoName, onValueChange = { newRepoName = it }, label = { Text(t("project_name", languageSetting)) }); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(value = newRepoDesc, onValueChange = { newRepoDesc = it }, label = { Text(t("description", languageSetting)) }); Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = isPrivate, onCheckedChange = { isPrivate = it }); Text(t("private_repository", languageSetting)) } } }, confirmButton = { Button(onClick = { scope.launch { if (createGitHubRepo(token, newRepoName, newRepoDesc, isPrivate)) { showCreateDialog = false; refresh() } } }) { Text(t("create", languageSetting)) } }, dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text(t("cancel", languageSetting)) } })
         if (repoToDelete != null) AlertDialog(onDismissRequest = { repoToDelete = null }, title = { Text(t("delete_project_title", languageSetting)) }, text = { Text(t("delete_project_confirm", languageSetting).replace("%s", repoToDelete!!.name)) }, confirmButton = { Button(onClick = { val r = repoToDelete!!; repoToDelete = null; scope.launch { if (if (platform == "GitHub") deleteGitHubRepo(token, owner, r.name) else deleteCodebergRepo(token, owner, r.name)) refresh() } }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(t("yes_delete", languageSetting)) } }, dismissButton = { TextButton(onClick = { repoToDelete = null }) { Text(t("cancel", languageSetting)) } })
         if (repoToRename != null) AlertDialog(onDismissRequest = { repoToRename = null }, title = { Text(t("rename_project_title", languageSetting)) }, text = { Column { OutlinedTextField(value = renameRepoNameInput, onValueChange = { renameRepoNameInput = it }, label = { Text(t("new_name", languageSetting)) }) } }, confirmButton = { Button(onClick = { val r = repoToRename!!; repoToRename = null; scope.launch { if (if (platform == "GitHub") renameGitHubRepo(token, owner, r.name, renameRepoNameInput) else renameCodebergRepo(token, owner, r.name, renameRepoNameInput)) refresh() } }) { Text(t("rename", languageSetting)) } }, dismissButton = { TextButton(onClick = { repoToRename = null }) { Text(t("cancel", languageSetting)) } })
-        
+
         if (showActionChoice != null) {
             AlertDialog(
                 onDismissRequest = { showActionChoice = null },
@@ -2693,9 +2955,9 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
                         Spacer(Modifier.height(12.dp))
 
                         Button(
-                            onClick = { 
+                            onClick = {
                                 onRepoSelectedPR(showActionChoice!!)
-                                showActionChoice = null 
+                                showActionChoice = null
                             },
                             modifier = Modifier.fillMaxWidth().height(60.dp),
                             shape = RoundedCornerShape(16.dp),
@@ -2728,7 +2990,7 @@ fun FullRepoListScreen(owner: String, title: String, token: String, platform: St
                                 Text(t("releases", languageSetting), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
                         }
-                        
+
                         Spacer(Modifier.height(16.dp))
                         TextButton(onClick = { showActionChoice = null }) {
                             Text(t("cancel", languageSetting), color = MaterialTheme.colorScheme.primary)
@@ -2787,7 +3049,6 @@ fun ProjectFilesScreen(
         }
     }
 
-    // State for Multi-Upload and Queue
     var uploadQueue by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var currentUploadIndex by remember { mutableStateOf(0) }
     var currentUploadName by remember { mutableStateOf("") }
@@ -2797,11 +3058,9 @@ fun ProjectFilesScreen(
     var isUploadingGlobal by remember { mutableStateOf(false) }
     var hasCheckedProPlan by remember { mutableStateOf(false) }
     var isGitHubProPlan by remember { mutableStateOf(false) }
-    
-    // Set to keep track of successful uploads or already uploaded names in the current active operation loop
+
     var completedFileNames by remember { mutableStateOf(setOf<String>()) }
 
-    // Check plan info once
     LaunchedEffect(token) {
         if (platform == "GitHub" && token.isNotBlank() && !hasCheckedProPlan) {
             withContext(Dispatchers.IO) {
@@ -2826,7 +3085,6 @@ fun ProjectFilesScreen(
         }
     }
 
-    // Core upload loop managing queue
     LaunchedEffect(uploadQueue.size) {
         if (uploadQueue.isNotEmpty() && !isUploadingGlobal) {
             isUploadingGlobal = true
@@ -2838,16 +3096,14 @@ fun ProjectFilesScreen(
                 currentUploadSpeed = "0.0 MB/s"
                 currentUploadProgress = 0f
 
-                // Duplicate Check: Check if this exact file was already processed successfully or exists earlier in this loop execution
                 val occurrencesCount = uploadQueue.take(currentUploadIndex).count { getFileName(context, it) == fileName }
                 val isAlreadyPresentOnServer = files.any { it.name == fileName }
-                
+
                 if (occurrencesCount > 0 || isAlreadyPresentOnServer || completedFileNames.contains(fileName)) {
                     currentUploadIndex++
                     continue
                 }
 
-                // 1. Get file size from resolver to avoid loading whole large bytes into memory at once
                 var fileSize = 0L
                 try {
                     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -2858,7 +3114,6 @@ fun ProjectFilesScreen(
                     }
                 } catch(e: Exception) {}
 
-                // Determine file limit based on plan (100MB for GitHub standard, 2GB for Pro / others)
                 val maxLimit = if (platform == "GitHub" && !isGitHubProPlan) 100 * 1024 * 1024L else 2000 * 1024 * 1024L
 
                 if (fileSize > maxLimit) {
@@ -2866,7 +3121,6 @@ fun ProjectFilesScreen(
                     continue
                 }
 
-                // 2. Safely read bytes in a streaming fashion or normal copy
                 val bytes = try {
                     context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 } catch(e: Exception) { null }
@@ -2877,41 +3131,38 @@ fun ProjectFilesScreen(
                 }
 
                 val pathPrefix = if (currentPath.isEmpty()) "" else "$currentPath/"
-                
-                // Track progress & speed by simulating chunked or tracked upload info via asynchronous callback
+
                 val totalPayloadSize = bytes.size
                 var bytesSent = 0
                 val base64Content = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                
+
                 val startTime = System.currentTimeMillis()
-                
-                // Asynchronous progress simulation loop matching the true backend chunking behavior
+
                 val progressJob = scope.launch {
                     while (bytesSent < totalPayloadSize && isUploadingGlobal) {
                         delay(200)
                         val elapsed = (System.currentTimeMillis() - startTime) / 1000f
-                        val added = (5 * 1024 * 1024 * 0.2f).toInt() 
+                        val added = (5 * 1024 * 1024 * 0.2f).toInt()
                         bytesSent = (bytesSent + added).coerceAtMost(totalPayloadSize)
                         currentUploadProgress = bytesSent.toFloat() / totalPayloadSize
-                        
+
                         val currentSpeedBytes = if (elapsed > 0) bytesSent / elapsed else 0f
                         currentUploadSpeed = String.format("%.1f MB/s", currentSpeedBytes / (1024 * 1024))
                     }
                 }
 
                 val success = uploadFileToPlatform(token, repo.owner, repo.name, "$pathPrefix$fileName", base64Content, platform, languageSetting, selectedBranch)
-                
+
                 progressJob.cancel()
                 bytesSent = totalPayloadSize
                 currentUploadProgress = 1f
-                
+
                 if (success) {
                     completedFileNames = completedFileNames + fileName
                     delay(500)
                 }
                 currentUploadIndex++
             }
-            // Done uploading the whole batch
             if (completedFileNames.isNotEmpty()) {
                 val count = completedFileNames.size
                 val msg = if (languageSetting == "de") {
@@ -3003,7 +3254,6 @@ fun ProjectFilesScreen(
                 }
             }
 
-            // Beautiful Minimalist Glass style Upload Menu Overlay at the bottom center
             if (uploadQueue.isNotEmpty() && currentUploadIndex < uploadQueue.size) {
                 Box(
                     modifier = Modifier
@@ -3013,8 +3263,8 @@ fun ProjectFilesScreen(
                 ) {
                     Card(
                         modifier = Modifier
-                            .fillMaxWidth(0.72f) // Kürzer auf der rechten Seite für mehr Platz zum Upload-Button
-                            .align(Alignment.BottomStart), 
+                            .fillMaxWidth(0.72f)
+                            .align(Alignment.BottomStart),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
@@ -3046,7 +3296,7 @@ fun ProjectFilesScreen(
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(32.dp),
-                                        strokeWidth = 16.dp, 
+                                        strokeWidth = 16.dp,
                                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                         trackColor = Color.Transparent,
                                         progress = { 1f }
@@ -3054,7 +3304,7 @@ fun ProjectFilesScreen(
                                     CircularProgressIndicator(
                                         progress = { currentUploadProgress },
                                         modifier = Modifier.size(32.dp),
-                                        strokeWidth = 16.dp, 
+                                        strokeWidth = 16.dp,
                                         color = MaterialTheme.colorScheme.primary,
                                         trackColor = Color.Transparent
                                     )
@@ -3075,7 +3325,7 @@ fun ProjectFilesScreen(
                                         )
                                         if (currentUploadProgress >= 0.95f) {
                                             Text(
-                                                text = "• " + (if(languageSetting == "de") "Abschluss..." else "Finishing..."),
+                                                text = "• " + t("finishing", languageSetting),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.primary,
                                                 fontWeight = FontWeight.Bold
@@ -3084,7 +3334,7 @@ fun ProjectFilesScreen(
                                     }
                                 }
                             }
-                            
+
                             if (uploadQueue.size > 1) {
                                 Surface(
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
@@ -3155,9 +3405,9 @@ fun VideoPlayerComponent(url: String, modifier: Modifier = Modifier) {
                         isPlaying = true
                     }
                     setOnInfoListener { _, what, _ ->
-                        if (what == 701) { // MEDIA_INFO_BUFFERING_START
+                        if (what == 701) {
                             isVideoBuffering = true
-                        } else if (what == 702) { // MEDIA_INFO_BUFFERING_END
+                        } else if (what == 702) {
                             isVideoBuffering = false
                         }
                         false
@@ -4105,28 +4355,67 @@ private suspend fun downloadApk(context: Context, fileName: String, url: String,
                 while (read >= 0) { out.write(buf, 0, read); total += read; withContext(Dispatchers.Main) { if (len > 0) onProgress("${(total * 100 / len).toInt()}%") else onProgress("${total / 1024 / 1024}${t("mb_loaded", languageSetting)}") }; read = input.read(buf) }
             } }
             withContext(Dispatchers.Main) { onProgress("100%") }
+            getFullApkIcon(context, file)
             return@withContext file
         }
     } catch (e: Exception) { null }
+}
+
+data class ParsedApkFile(val platform: String, val owner: String, val appName: String, val version: String)
+
+private fun parseApkFileName(fileName: String): ParsedApkFile {
+    val nameWithoutExt = fileName.removeSuffix(".apk")
+    val parts = nameWithoutExt.split("_")
+    if (parts.size < 4) {
+        return ParsedApkFile(
+            platform = parts.getOrNull(0) ?: "",
+            owner = parts.getOrNull(1) ?: "",
+            appName = parts.getOrNull(2) ?: nameWithoutExt,
+            version = parts.getOrNull(3) ?: ""
+        )
+    }
+    val platform = parts[0]
+    val owner = parts[1]
+
+    var versionStartIdx = -1
+    for (i in 2 until parts.size) {
+        val p = parts[i]
+        if (p.matches(Regex("(?i)^v?\\d.*"))) {
+            versionStartIdx = i
+            break
+        }
+    }
+
+    val appName: String
+    val version: String
+    if (versionStartIdx > 2) {
+        appName = parts.subList(2, versionStartIdx).joinToString("_")
+        version = parts.subList(versionStartIdx, parts.size).joinToString("_")
+    } else if (versionStartIdx == 2) {
+        appName = parts[2]
+        version = parts.subList(3, parts.size).joinToString("_")
+    } else {
+        appName = parts.subList(2, parts.size - 1).joinToString("_")
+        version = parts.last()
+    }
+
+    return ParsedApkFile(platform, owner, appName, version)
 }
 
 private fun installApk(context: Context, file: File) {
     val pm = context.packageManager
     val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
     val info = pm.getPackageArchiveInfo(file.absolutePath, 0)
-    
+
     if (info != null) {
         val packageName = info.packageName
-        
+
         val fileName = file.name
-        val fnParts = fileName.removeSuffix(".apk").split("_")
-        if (fnParts.size >= 3) {
-            val platform = fnParts[0]
-            val owner = fnParts[1]
-            val appName = fnParts[2]
+        val parsed = parseApkFileName(fileName)
+        if (parsed.platform.isNotBlank() && parsed.owner.isNotBlank() && parsed.appName.isNotBlank()) {
             val metaMapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet())?.toMutableSet() ?: mutableSetOf()
             metaMapping.removeAll { it.startsWith("$packageName|") }
-            metaMapping.add("$packageName|$platform|$owner|$appName")
+            metaMapping.add("$packageName|${parsed.platform}|${parsed.owner}|${parsed.appName}")
             prefs.edit().putStringSet("INSTALLED_APPS_META", metaMapping).apply()
         }
 
@@ -4136,7 +4425,7 @@ private fun installApk(context: Context, file: File) {
             prefs.edit().putStringSet("APK_DELETE_MAPPING", mapping).apply()
         }
     }
-    
+
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
     context.startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/vnd.android.package-archive"); flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK })
 }
@@ -4147,16 +4436,70 @@ private fun isApkValid(context: Context, file: File): Boolean {
     } catch (e: Exception) { false }
 }
 
-private fun getApkIcon(context: Context, file: File): Drawable? {
+
+
+private val apkIconMemoryCache = android.util.LruCache<String, Drawable>(100)
+private val fullApkIconMemoryCache = android.util.LruCache<String, Drawable>(50)
+
+private fun getFastCachedApkIcon(context: Context, file: File): Drawable? {
+    if (!file.exists()) return null
+    val cacheKey = "${file.name}_${file.lastModified()}"
+    fullApkIconMemoryCache.get(cacheKey)?.let { return it }
+    apkIconMemoryCache.get(cacheKey)?.let { return it }
+
+    val cacheFile = File(File(context.cacheDir, "apk_icons"), "${cacheKey}.png")
+    if (cacheFile.exists()) {
+        try {
+            val bitmap = android.graphics.BitmapFactory.decodeFile(cacheFile.absolutePath)
+            if (bitmap != null) {
+                val drawable = android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+                apkIconMemoryCache.put(cacheKey, drawable)
+                return drawable
+            }
+        } catch (e: Exception) { cacheFile.delete() }
+    }
+    return null
+}
+
+private fun getFullApkIcon(context: Context, file: File): Drawable? {
+    if (!file.exists()) return null
+    val cacheKey = "${file.name}_${file.lastModified()}"
+    fullApkIconMemoryCache.get(cacheKey)?.let { return it }
+
     return try {
         val pm = context.packageManager
         val info = pm.getPackageArchiveInfo(file.absolutePath, 0)
         info?.applicationInfo?.let {
             it.sourceDir = file.absolutePath
             it.publicSourceDir = file.absolutePath
-            it.loadIcon(pm)
+            val rawDrawable = it.loadIcon(pm)
+            if (rawDrawable != null) {
+                val cacheDir = File(context.cacheDir, "apk_icons").apply { if (!exists()) mkdirs() }
+                val cacheFile = File(cacheDir, "${cacheKey}.png")
+                if (!cacheFile.exists()) {
+                    try {
+                        val width = 192
+                        val height = 192
+                        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                        val canvas = android.graphics.Canvas(bitmap)
+                        rawDrawable.setBounds(0, 0, width, height)
+                        rawDrawable.draw(canvas)
+
+                        java.io.FileOutputStream(cacheFile).use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 85, out)
+                        }
+                    } catch (e: Exception) { /* ignore write failure */ }
+                }
+
+                fullApkIconMemoryCache.put(cacheKey, rawDrawable)
+                rawDrawable
+            } else null
         }
     } catch (e: Exception) { null }
+}
+
+private fun getApkIcon(context: Context, file: File): Drawable? {
+    return getFullApkIcon(context, file) ?: getFastCachedApkIcon(context, file)
 }
 
 private suspend fun repairApk(context: Context, file: File, platform: String, owner: String, repo: String, version: String, ghToken: String, cbToken: String, languageSetting: String, onProgress: (String) -> Unit): Boolean = withContext(Dispatchers.IO) {
@@ -4402,6 +4745,7 @@ fun PullRequestsScreen(app: OpenSourceApp, githubToken: String, codebergToken: S
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageSetting: String, onUserClick: (String, String, String) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     var comments by remember { mutableStateOf<List<IssueComment>>(emptyList()) }
@@ -4410,11 +4754,27 @@ fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageS
     val myProfile = remember { mutableStateOf<UserProfile?>(null) }
     var showMergeConfirm by remember { mutableStateOf(false) }
 
+    var uploadingImage by remember { mutableStateOf(false) }
     var commentToDelete by remember { mutableStateOf<IssueComment?>(null) }
 
     val showCommentBar by remember {
         derivedStateOf {
             commentText.isNotBlank() || listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 120 || listState.layoutInfo.visibleItemsInfo.any { it.index > 0 }
+        }
+    }
+
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            uploadingImage = true
+            scope.launch {
+                val url = uploadImageFile(context, uri, token, app, languageSetting)
+                if (url != null) {
+                    commentText += (if (commentText.isBlank()) "" else "\n") + "![]($url)\n"
+                } else {
+                    Toast.makeText(context, t("status_error", languageSetting), Toast.LENGTH_SHORT).show()
+                }
+                uploadingImage = false
+            }
         }
     }
 
@@ -4550,9 +4910,23 @@ fun PRDetailScreen(app: OpenSourceApp, pr: PullRequest, token: String, languageS
                 exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(300))
             ) {
                 Surface(tonalElevation = 8.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-                    Row(modifier = Modifier.padding(8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(value = commentText, onValueChange = { commentText = it }, placeholder = { Text(t("write_comment", languageSetting)) }, modifier = Modifier.weight(1f), maxLines = 5)
-                        IconButton(onClick = { scope.launch { if (commentText.isNotBlank() && postComment(token, app.owner, app.name, app.platform, pr.number, commentText)) { commentText = ""; comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login) } } }, enabled = commentText.isNotBlank()) { Icon(Icons.Default.Send, null, tint = if(commentText.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray) }
+                    Column(Modifier.padding(8.dp)) {
+                        if (uploadingImage) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                        }
+                        val imageLinks = "!\\[.*?]\\((.*?)\\)".toRegex().findAll(commentText).map { it.groupValues[1] }.toList()
+                        if (imageLinks.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                                items(imageLinks) { url ->
+                                    AsyncImage(model = url, contentDescription = null, modifier = Modifier.size(60.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
+                                }
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { photoPicker.launch("image/*") }) { Icon(Icons.Default.AddPhotoAlternate, null, tint = MaterialTheme.colorScheme.primary) }
+                            OutlinedTextField(value = commentText, onValueChange = { commentText = it }, placeholder = { Text(t("write_comment", languageSetting)) }, modifier = Modifier.weight(1f), maxLines = 5)
+                            IconButton(onClick = { scope.launch { if (commentText.isNotBlank() && postComment(token, app.owner, app.name, app.platform, pr.number, commentText)) { commentText = ""; comments = fetchIssueComments(token, app.owner, app.name, app.platform, pr.number, myProfile.value?.login) } } }, enabled = commentText.isNotBlank()) { Icon(Icons.Default.Send, null, tint = if(commentText.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray) }
+                        }
                     }
                 }
             }
@@ -4681,6 +5055,39 @@ fun StatsCard(label: String, value: String, icon: androidx.compose.ui.graphics.v
 }
 
 
+private sealed interface MarkdownSegment {
+    data class Text(val content: String) : MarkdownSegment
+    data class Image(val url: String) : MarkdownSegment
+}
+
+private fun parseMarkdownSegments(rawText: String): List<MarkdownSegment> {
+    val cleanText = rawText.replace("\uFFFC", "")
+    val imagePattern = "(?:!\\[.*?\\]\\((.*?)\\))|(?:<img[^>]+src=[\"']([^\"']+)[\"'][^>]*>)".toRegex(RegexOption.IGNORE_CASE)
+    val segments = mutableListOf<MarkdownSegment>()
+    var lastIndex = 0
+
+    for (match in imagePattern.findAll(cleanText)) {
+        val textBefore = cleanText.substring(lastIndex, match.range.first)
+        if (textBefore.isNotEmpty()) {
+            segments.add(MarkdownSegment.Text(textBefore))
+        }
+        val url = match.groupValues[1].ifEmpty { match.groupValues[2] }.trim()
+        if (url.isNotBlank()) {
+            segments.add(MarkdownSegment.Image(url))
+        }
+        lastIndex = match.range.last + 1
+    }
+
+    if (lastIndex < cleanText.length) {
+        val remainingText = cleanText.substring(lastIndex)
+        if (remainingText.isNotEmpty()) {
+            segments.add(MarkdownSegment.Text(remainingText))
+        }
+    }
+
+    return segments
+}
+
 @Composable
 fun MarkdownBody(text: String, languageSetting: String, modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
@@ -4707,18 +5114,88 @@ fun MarkdownBody(text: String, languageSetting: String, modifier: Modifier = Mod
         )
     }
 
-    MarkdownText(
-        markdown = text,
-        modifier = modifier,
-        style = MaterialTheme.typography.bodyMedium.copy(
-            color = MaterialTheme.colorScheme.onSurface
-        ),
-        linkColor = MaterialTheme.colorScheme.primary,
-        onLinkClicked = { url ->
-            pendingUri = url
+    val segments = remember(text) { parseMarkdownSegments(text) }
+
+    Column(modifier = modifier) {
+        segments.forEach { segment ->
+            when (segment) {
+                is MarkdownSegment.Text -> {
+                    MarkdownText(
+                        markdown = segment.content,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        linkColor = MaterialTheme.colorScheme.primary,
+                        onLinkClicked = { url ->
+                            pendingUri = url
+                        }
+                    )
+                }
+                is MarkdownSegment.Image -> {
+                    AsyncImage(
+                        model = segment.url,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.FillWidth
+                    )
+                }
+            }
         }
-    )
+    }
 }
+
+private suspend fun uploadImageFile(
+    context: Context,
+    uri: android.net.Uri,
+    token: String,
+    app: OpenSourceApp,
+    languageSetting: String
+): String? = withContext(Dispatchers.IO) {
+    try {
+        val bytes = context.contentResolver.openInputStream(uri)?.readBytes() ?: return@withContext null
+        val fileName = getFileName(context, uri)
+        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+        if (token.isBlank()) return@withContext null
+
+        if (uploadFileToPlatform(token, app.owner, app.name, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
+            return@withContext if (app.platform == "GitHub")
+                "https://raw.githubusercontent.com/${app.owner}/${app.name}/HEAD/.opi_store/uploads/$fileName"
+            else
+                "https://codeberg.org/${app.owner}/${app.name}/raw/branch/main/.opi_store/uploads/$fileName"
+        }
+
+        val profile = if (app.platform == "GitHub") fetchGitHubProfile(token) else fetchCodebergProfile(token)
+        val myLogin = profile?.login ?: return@withContext null
+
+        if (uploadFileToPlatform(token, myLogin, myLogin, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
+            return@withContext if (app.platform == "GitHub")
+                "https://raw.githubusercontent.com/$myLogin/$myLogin/HEAD/.opi_store/uploads/$fileName"
+            else
+                "https://codeberg.org/$myLogin/$myLogin/raw/branch/main/.opi_store/uploads/$fileName"
+        }
+
+        val created = if (app.platform == "GitHub") {
+            createGitHubRepo(token, myLogin, "Opi Store uploads", false)
+        } else {
+            false
+        }
+
+        if (created && uploadFileToPlatform(token, myLogin, myLogin, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
+            return@withContext if (app.platform == "GitHub")
+                "https://raw.githubusercontent.com/$myLogin/$myLogin/HEAD/.opi_store/uploads/$fileName"
+            else
+                "https://codeberg.org/$myLogin/$myLogin/raw/branch/main/.opi_store/uploads/$fileName"
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return@withContext null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageSetting: String, onUserClick: (String, String, String) -> Unit, onBack: () -> Unit) {
@@ -4745,17 +5222,11 @@ fun IssueDetailScreen(app: OpenSourceApp, issue: Issue, token: String, languageS
         if (uri != null) {
             uploadingImage = true
             scope.launch {
-                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
-                if (bytes != null) {
-                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    val fileName = getFileName(context, uri)
-                    if (uploadFileToPlatform(token, app.owner, app.name, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
-                        val rawUrl = if (app.platform == "GitHub")
-                            "https://raw.githubusercontent.com/${app.owner}/${app.name}/HEAD/.opi_store/uploads/$fileName"
-                        else
-                            "https://codeberg.org/${app.owner}/${app.name}/raw/branch/main/.opi_store/uploads/$fileName"
-                        commentText += "\n![]($rawUrl)\n"
-                    }
+                val url = uploadImageFile(context, uri, token, app, languageSetting)
+                if (url != null) {
+                    commentText += (if (commentText.isBlank()) "" else "\n") + "![]($url)\n"
+                } else {
+                    Toast.makeText(context, t("status_error", languageSetting), Toast.LENGTH_SHORT).show()
                 }
                 uploadingImage = false
             }
@@ -4949,17 +5420,11 @@ fun CreateIssueDialog(app: OpenSourceApp, token: String, languageSetting: String
         if (uri != null) {
             uploadingImage = true
             scope.launch {
-                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
-                if (bytes != null) {
-                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    val fileName = getFileName(context, uri)
-                    if (uploadFileToPlatform(token, app.owner, app.name, ".opi_store/uploads/$fileName", base64, app.platform, languageSetting)) {
-                        val rawUrl = if (app.platform == "GitHub")
-                            "https://raw.githubusercontent.com/${app.owner}/${app.name}/HEAD/.opi_store/uploads/$fileName"
-                        else
-                            "https://codeberg.org/${app.owner}/${app.name}/raw/branch/main/.opi_store/uploads/$fileName"
-                        body += "\n![]($rawUrl)\n"
-                    }
+                val url = uploadImageFile(context, uri, token, app, languageSetting)
+                if (url != null) {
+                    body += (if (body.isBlank()) "" else "\n") + "![]($url)\n"
+                } else {
+                    Toast.makeText(context, t("status_error", languageSetting), Toast.LENGTH_SHORT).show()
                 }
                 uploadingImage = false
             }
@@ -5070,10 +5535,10 @@ private suspend fun fetchIssueComments(token: String, owner: String, repo: Strin
             val arr = JSONArray(resp.body?.string() ?: "[]")
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i); val user = obj.getJSONObject("user")
-                
+
                 var reactions = 0
                 var myReactionId: String? = null
-                
+
                 if (platform == "GitHub") {
                     reactions = if (obj.has("reactions")) obj.getJSONObject("reactions").optInt("total_count", 0) else 0
                     if (myLogin != null) {
@@ -5399,7 +5864,7 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
                                     )
                                     Text(rel.tagName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
                                 }
-                                
+
                                 Surface(
                                     color = if (rel.isPreRelease) Color(0xFFFFA000).copy(alpha = 0.1f) else Color(0xFF4CAF50).copy(alpha = 0.1f),
                                     shape = RoundedCornerShape(8.dp)
@@ -5413,18 +5878,18 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
                                     )
                                 }
                             }
-                            
+
                             Spacer(Modifier.height(16.dp))
                             HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
                             Spacer(Modifier.height(12.dp))
-                            
+
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.AttachFile, null, modifier = Modifier.size(14.dp), tint = Color.Gray)
                                 Spacer(Modifier.width(4.dp))
                                 Text("${rel.assets.size} ${t("assets", languageSetting)}", fontSize = 12.sp, color = Color.Gray)
-                                
+
                                 Spacer(Modifier.weight(1f))
-                                
+
                                 Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
@@ -5436,7 +5901,7 @@ fun ReleasesManagementScreen(repo: SimpleRepo, token: String, platform: String, 
         if (showCreateDialog) {
             AlertDialog(
                 onDismissRequest = { if (!isCreating) showCreateDialog = false },
-                title = { Text(if (languageSetting == "de") "Neues Release erstellen" else "Create New Release") },
+                title = { Text(t("create_new_release", languageSetting)) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box {
@@ -5624,7 +6089,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                         Text(text = "Metadata", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                     Spacer(Modifier.height(16.dp))
-                    
+
                     Box(modifier = Modifier.fillMaxWidth().clickable { showTagSelector = true }) {
                         OutlinedTextField(
                             value = tagName,
@@ -5648,12 +6113,12 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                             }
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text(if (languageSetting == "de") "Tag erstellen..." else "Create Tag...", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
+                                text = { Text(t("create_tag_prompt", languageSetting), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
                                 onClick = { showCreateTagDialog = true; showTagSelector = false }
                             )
                         }
                     }
-                    
+
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = releaseName,
@@ -5662,9 +6127,9 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    
+
                     Spacer(Modifier.height(16.dp))
-                    
+
                     Button(
                         onClick = { showBodyEditor = true },
                         modifier = Modifier.fillMaxWidth(),
@@ -5677,9 +6142,9 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(24.dp))
-            
+
             Text(
                 text = t("assets", languageSetting),
                 fontWeight = FontWeight.Black,
@@ -5687,7 +6152,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                 modifier = Modifier.padding(start = 4.dp)
             )
             Spacer(Modifier.height(12.dp))
-            
+
             val infiniteTransition = rememberInfiniteTransition(label = "upload")
             val arrowOffset by infiniteTransition.animateFloat(
                 initialValue = 5f,
@@ -5716,11 +6181,11 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Cloud, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                             Icon(
-                                Icons.Default.ArrowUpward, 
-                                null, 
+                                Icons.Default.ArrowUpward,
+                                null,
                                 modifier = Modifier
                                     .size(24.dp)
-                                    .offset(y = arrowOffset.dp), 
+                                    .offset(y = arrowOffset.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -5733,13 +6198,13 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             assets.filter { it.id !in stagedAssetsToDelete }.forEach { asset ->
                 val isSource = asset.name.endsWith(".zip") || asset.name.endsWith(".tar.gz")
                 val isApk = asset.name.endsWith(".apk")
-                
+
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     shape = RoundedCornerShape(16.dp),
@@ -5748,12 +6213,12 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                     ListItem(
                         headlineContent = { Text(asset.name, fontWeight = if (isApk) FontWeight.Bold else FontWeight.Normal) },
                         supportingContent = { Text("${asset.size / 1024} KB") },
-                        leadingContent = { 
+                        leadingContent = {
                             Icon(
                                 if (isApk) Icons.Default.Android else if (isSource) Icons.Default.Code else Icons.Default.InsertDriveFile,
                                 null,
                                 tint = if (isApk) Color(0xFF4CAF50) else Color.Gray
-                            ) 
+                            )
                         },
                         trailingContent = {
                             if (!isSource) {
@@ -5769,7 +6234,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
 
             if (stagedUploads.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
-                Text(if (languageSetting == "de") "Geplante Uploads" else "Staged Uploads", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(t("staged_uploads", languageSetting), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 stagedUploads.forEachIndexed { index, (name, bytes) ->
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -5790,9 +6255,9 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(40.dp))
-            
+
             Spacer(Modifier.height(80.dp))
         }
         }
@@ -5843,10 +6308,10 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
     if (showCreateTagDialog) {
         AlertDialog(
             onDismissRequest = { showCreateTagDialog = false },
-            title = { Text(if (languageSetting == "de") "Neuen Tag erstellen" else "Create New Tag") },
+            title = { Text(t("create_new_tag", languageSetting)) },
             text = {
                 Column {
-                    Text(if (languageSetting == "de") "Geben Sie einen Namen für den neuen Tag ein:" else "Enter a name for the new tag:")
+                    Text(t("enter_tag_name", languageSetting))
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = newTagNameInput,
@@ -5868,7 +6333,7 @@ fun ReleaseEditScreen(repo: SimpleRepo, release: FullRelease, token: String, pla
                         }
                     },
                     enabled = newTagNameInput.isNotBlank()
-                ) { Text(if (languageSetting == "de") "Erstellen" else "Create") }
+                ) { Text(t("create", languageSetting)) }
             },
             dismissButton = {
                 TextButton(onClick = { showCreateTagDialog = false }) { Text(t("cancel", languageSetting)) }
@@ -6256,7 +6721,7 @@ fun LinkRepoDialog(
     var searchResults by remember { mutableStateOf<List<OpenSourceApp>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var selectedRepo by remember { mutableStateOf<OpenSourceApp?>(null) }
-    
+
     var showVerificationDialog by remember { mutableStateOf(false) }
     var verificationStatus by remember { mutableStateOf("") }
     var verificationError by remember { mutableStateOf<String?>(null) }
@@ -6287,34 +6752,34 @@ fun LinkRepoDialog(
         showVerificationDialog = true
         verificationError = null
         verificationStatus = t("verifying", languageSetting)
-        
+
         try {
             val pm = context.packageManager
             val installedInfo = pm.getPackageInfo(preSelectedPackageName, 0)
             val installedVersion = installedInfo.versionName ?: ""
-            
+
             verificationStatus = t("checking_version", languageSetting).format(installedVersion)
-            
+
             val releases = if (app.platform == "GitHub") fetchGitHubReleases(app.owner, app.name, githubToken)
                            else fetchCodebergReleases(app.owner, app.name, codebergToken)
-            
+
             val matchingRelease = releases.find { it.version.trim().removePrefix("v") == installedVersion.trim().removePrefix("v") }
-            
+
             if (matchingRelease == null) {
                 verificationError = t("version_mismatch", languageSetting).format(installedVersion)
                 isVerifying = false
                 return
             }
-            
+
             val apkAsset = matchingRelease.downloadUrl
             if (apkAsset.isBlank()) {
                 verificationError = t("no_apk_found", languageSetting)
                 isVerifying = false
                 return
             }
-            
+
             verificationStatus = t("downloading", languageSetting)
-            
+
             val matches = withContext(Dispatchers.IO) {
                 try {
                     val tempFile = File(context.cacheDir, "temp_verify.apk")
@@ -6323,23 +6788,23 @@ fun LinkRepoDialog(
                         if (!resp.isSuccessful) return@withContext false
                         tempFile.outputStream().use { out -> resp.body?.byteStream()?.copyTo(out) }
                     }
-                    
+
                     withContext(Dispatchers.Main) {
                         verificationStatus = t("verifying", languageSetting)
                     }
-                    
+
                     val info = pm.getPackageArchiveInfo(tempFile.absolutePath, 0)
                     val result = info?.packageName == preSelectedPackageName
                     tempFile.delete()
                     result
                 } catch (e: Exception) { false }
             }
-            
+
             if (matches) {
                 val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
                 val metaMapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet())?.toMutableSet() ?: mutableSetOf()
                 metaMapping.removeAll { it.startsWith("$preSelectedPackageName|") }
-                metaMapping.add("$preSelectedPackageName|${app.platform}|${app.owner}|${app.name}")
+                metaMapping.add("$preSelectedPackageName|${app.platform}|${app.owner}|${app.name}|${matchingRelease.version}")
                 prefs.edit().putStringSet("INSTALLED_APPS_META", metaMapping).apply()
                 showVerificationDialog = false
                 Toast.makeText(context, t("app_imported_success", languageSetting), Toast.LENGTH_SHORT).show()
@@ -6540,7 +7005,8 @@ fun LinkAppDialog(
                                     val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
                                     val metaMapping = prefs.getStringSet("INSTALLED_APPS_META", emptySet())?.toMutableSet() ?: mutableSetOf()
                                     metaMapping.removeAll { it.startsWith("${item.packageName}|") }
-                                    metaMapping.add("${item.packageName}|${repo.platform}|${repo.owner}|${repo.name}")
+                                    val relTag = repo.preFetchedReleases?.firstOrNull()?.version ?: ""
+                                    metaMapping.add("${item.packageName}|${repo.platform}|${repo.owner}|${repo.name}|$relTag")
                                     prefs.edit().putStringSet("INSTALLED_APPS_META", metaMapping).apply()
                                     Toast.makeText(context, t("app_imported_success", languageSetting), Toast.LENGTH_SHORT).show()
                                     onImportComplete()

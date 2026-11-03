@@ -1,12 +1,224 @@
 <resources>
     <string name="app_name">Opi Store</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_apk_manager">APK Manager</string>
+    <string name="tab_account">Account</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="search_title">🚀 Opi Store</string>
+    <string name="search_hint">Search...</string>
+    <string name="status_loading_repo">Loading repo from link...</string>
+    <string name="status_no_apks">This project has no Android APKs.</string>
+    <string name="status_no_project">No matching project found.</string>
+    <string name="status_searching">Searching and filtering APKs...</string>
+    <string name="status_no_apps_found">No Android apps with APK found.</string>
+    <string name="status_error">Error occurred.</string>
+
+    <string name="by">by</string>
+    <string name="followers">Followers</string>
+    <string name="description">Description</string>
+    <string name="no_releases">No APK releases found for this project.</string>
+    <string name="stable_release">Stable Release</string>
+    <string name="pre_release">Pre-Release</string>
+    <string name="downloading">Downloading...</string>
+    <string name="download_apk">Download APK</string>
+    <string name="already_downloaded">Already downloaded (Install)</string>
+    <string name="select_version">Select Version</string>
+    <string name="select_asset">Select Asset</string>
+    <string name="stable_build">Stable Build</string>
+    <string name="beta_experimental">Beta / Experimental</string>
+
+    <string name="apk_manager_title">📦 APK Manager</string>
+    <string name="apk_manager_subtitle">Tap on an app to manage it.</string>
+    <string name="no_apks_downloaded">No APKs downloaded yet.</string>
+    <string name="install">Install</string>
+    <string name="repair">Repair</string>
+    <string name="apk_corrupted">APK incomplete or corrupted!</string>
+    <string name="repairing">Repairing...</string>
+    <string name="delete_apk">Delete APK file</string>
+
+    <string name="issues">Issues</string>
+    <string name="open">Open</string>
+    <string name="closed">Closed</string>
+    <string name="no_issues">No issues found.</string>
+    <string name="new_issue">New Issue</string>
+    <string name="title">Title</string>
+    <string name="body">Body</string>
+    <string name="post">Post</string>
+    <string name="comments">Comments</string>
+    <string name="write_comment">Write a comment...</string>
+
+    <string name="settings_title">⚙️ Settings</string>
+    <string name="design">Design</string>
+    <string name="language">Language</string>
+    <string name="select_design">Select Design</string>
+    <string name="select_language">Select Language</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <string name="profile_edit_title">Edit Profile</string>
+    <string name="display_name">Display Name</string>
+    <string name="bio">Bio</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="tap_to_edit">Tap Name/Bio to edit</string>
+    <string name="change_token">Change token</string>
+    <string name="my_repositories">My Repositories</string>
+    <string name="my_repository_editor">My Repository Editor</string>
+    <string name="starred">Starred</string>
+    <string name="login_title">Login</string>
+    <string name="personal_access_token">Personal Access Token</string>
+
+    <string name="search_apps_hint">Search apps...</string>
+    <string name="no_apps">No apps.</string>
+    <string name="delete">Delete</string>
+    <string name="rename">Rename</string>
+    <string name="rename_project_title">Rename Project</string>
+    <string name="new_name">New Name</string>
+    <string name="new_github_project">New GitHub Project</string>
+    <string name="project_name">Project Name</string>
+    <string name="private_repository">Private repository</string>
+    <string name="create">Create</string>
+
+    <string name="delete_project_title">🗑️ Delete project?</string>
+    <string name="delete_project_confirm">Do you really want to delete the repository permanently? This action cannot be undone!</string>
+    <string name="delete_issue_title">Delete Issue?</string>
+    <string name="delete_issue_confirm">Do you really want to delete this issue?</string>
+    <string name="delete_comment_title">Delete Comment?</string>
+    <string name="delete_comment_confirm">Do you really want to delete this comment?</string>
+    <string name="yes_delete">Yes, delete</string>
+
+    <string name="uploaded">Uploaded!</string>
+    <string name="upload_image">Upload image</string>
+    <string name="edit_via_app">Edit via App</string>
+    <string name="upload_via_app">Upload via App</string>
+    <string name="mb_loaded">MB loaded</string>
+    <string name="stable_releases_header">✅ STABLE RELEASES</string>
+    <string name="pre_releases_header">⚠️ PRE-RELEASES</string>
+    <string name="changelog">Changelog</string>
+    <string name="tutorial">Tutorial</string>
+    <string name="repo_private">private</string>
+    <string name="repo_public">public</string>
+
+    <string name="github_tutorial_title">GitHub Token Tutorial</string>
+    <string name="github_tutorial_step1">1. Open this link: https://github.com/settings/tokens</string>
+    <string name="github_tutorial_step2">2. Log in (or create an account).</string>
+    <string name="github_tutorial_step3">3. Click on \"Generate new token\" and select \"classic\".</string>
+    <string name="github_tutorial_step4">4. Give the token a name.</string>
+    <string name="github_tutorial_step5">5. Select ALL scopes.</string>
+    <string name="github_tutorial_step6">6. For \"Expiration\", select \"No expiration\".</string>
+    <string name="github_tutorial_step7">7. Click \"Generate token\" at the bottom.</string>
+    <string name="github_tutorial_step8">8. Copy the token and paste it here in the app.</string>
+
+    <string name="codeberg_tutorial_title">Codeberg Token Tutorial</string>
+    <string name="codeberg_tutorial_step1">1. Open this link: https://codeberg.org/user/settings/applications</string>
+    <string name="codeberg_tutorial_step2">2. Log in (or create an account).</string>
+    <string name="codeberg_tutorial_step3">3. Under \"Access Tokens\", click \"New Access Token\".</string>
+    <string name="codeberg_tutorial_step4">4. Give the token a name.</string>
+    <string name="codeberg_tutorial_step5">5. For \"Repository and Organization Access\", select \"All (public, private, limited)\".</string>
+    <string name="codeberg_tutorial_step6">6. For all permissions, select \"Read and Write\".</string>
+    <string name="codeberg_tutorial_step7">7. Click \"Generate Token\".</string>
+    <string name="codeberg_tutorial_step8">8. Copy the token and paste it here in the app.</string>
+
+    <string name="version">Version</string>
+    <string name="updates">Updates</string>
+    <string name="update_available">Update available</string>
+    <string name="update_now">Update now</string>
+    <string name="current_version">Current version</string>
+    <string name="new_version">New version</string>
+    <string name="download_complete">Download complete</string>
+    <string name="automatic_updates">Check for updates</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+    <string name="later">Maybe later</string>
+    <string name="changelog_title">What\'s new?</string>
+
+    <string name="repo_stats">Repository Statistics</string>
+    <string name="stars">Stars</string>
+    <string name="forks">Forks</string>
+    <string name="watchers">Watchers</string>
+    <string name="created_at">Created at</string>
+    <string name="total_downloads">Total downloads</string>
+    <string name="downloads_per_version">Downloads per version</string>
+
+    <string name="pull_requests">Pull Requests</string>
+    <string name="select_action">Select action</string>
+    <string name="editor">Editor</string>
+    <string name="merge">Merge</string>
+    <string name="merge_confirm">Do you really want to merge this pull request? The changes will be applied to the code.</string>
+    <string name="yes_merge">Yes, merge</string>
+    <string name="no_pull_requests">No pull requests found.</string>
+    <string name="merged">Merged</string>
+
+    <string name="category_appearance">Appearance</string>
+    <string name="category_system">System &amp; Updates</string>
+    <string name="auto_delete_apk">Auto-delete APK</string>
+    <string name="searching_updates">Checking for updates...</string>
+    <string name="no_update_found">No update found.</string>
+    <string name="update_available_msg">Update available!</string>
+    <string name="update_button">Update Now</string>
+    <string name="source_code">Source Code</string>
+    <string name="no_access">No access to this file.</string>
+
+    <string name="releases">Releases</string>
+    <string name="edit_release">Edit Release</string>
+    <string name="assets">Assets</string>
+    <string name="add_asset">Add Asset</string>
+    <string name="tag_name">Tag Name</string>
+    <string name="release_title">Release Title</string>
+    <string name="delete_release">Delete Release</string>
+    <string name="delete_release_confirm">Do you really want to delete this release?</string>
+    <string name="edit_changelog">Edit Description</string>
+    <string name="select_tag">Select Tag</string>
+
+    <string name="accent_color">Accent Color</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_red">Red</string>
+    <string name="accent_standard">Standard</string>
+
+    <string name="tab_apks">APKs</string>
+    <string name="tab_apps">Apps</string>
+    <string name="open_app">Open</string>
+    <string name="uninstall">Uninstall</string>
+    <string name="update_notice">Update available!</string>
+    <string name="import_app_title">Import App</string>
+    <string name="import_from_device">Import from device</string>
+    <string name="import_from_repo">Import from repository</string>
+    <string name="select_app_to_link">Select app to link</string>
+    <string name="link_with_repo">Link with repository</string>
+    <string name="app_imported_success">App imported successfully!</string>
+    <string name="search_repos_to_link">Search for repository...</string>
+
+    <string name="verifying">Verifying...</string>
+    <string name="checking_version">Checking version: %1$s</string>
+    <string name="version_mismatch">Error: No release found for version %1$s.</string>
+    <string name="no_apk_found">No APK found in this release.</string>
+    <string name="package_mismatch">Package name mismatch!</string>
+
+    <string name="open_browser_title">Open Link?</string>
+    <string name="open_browser_message">This link will open in your web browser. Do you want to proceed?</string>
+    <string name="proceed">Proceed</string>
+    <string name="system_app">System</string>
+    <string name="user_app">User</string>
+
+    <string name="versions_available">versions available</string>
+    <string name="close">Close</string>
+    <string name="versions_count">Versions</string>
+    <string name="create_new_release">Create New Release</string>
+    <string name="create_tag_prompt">Create Tag...</string>
+    <string name="staged_uploads">Staged Uploads</string>
+    <string name="create_new_tag">Create New Tag</string>
+    <string name="enter_tag_name">Enter a name for the new tag:</string>
+    <string name="finishing">Finishing...</string>
+
+    <!-- Navigation Strings -->
     <string name="nav_search">Search</string>
     <string name="nav_manager">APK Manager</string>
     <string name="nav_account">Account</string>
     <string name="nav_settings">Settings</string>
 
-    <string name="search_title">🚀 Opi Store</string>
-    <string name="search_hint">Search...</string>
     <string name="search_loading">Searching and filtering APKs...</string>
     <string name="search_no_results">No Android apps with APK found.</string>
     <string name="search_loading_link">Loading repo from link...</string>
@@ -21,7 +233,7 @@
     <string name="detail_no_releases">No APK releases found for this project.</string>
 
     <string name="manager_title">📦 APK Manager</string>
-    <string name="manager_subtitle">Tap an app to manage it.</string>
+    <string name="manager_subtitle">Tap on an app to manage it.</string>
     <string name="manager_empty">No APKs downloaded yet.</string>
     <string name="manager_install">Install</string>
     <string name="manager_delete">Delete APK file</string>
@@ -38,9 +250,7 @@
     <string name="account_token_hint">Personal Access Token</string>
     <string name="account_edit_hint">✏️ Tap to edit</string>
 
-    <string name="settings_title">⚙️ Settings</string>
     <string name="settings_theme">Theme</string>
-    <string name="settings_language">Language</string>
     <string name="settings_system">System</string>
     <string name="settings_light">Light</string>
     <string name="settings_dark">Dark</string>
