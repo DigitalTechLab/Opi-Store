@@ -1,8 +1,8 @@
 const REPO_OWNER = 'DigitalTechLab';
 const REPO_NAME = 'Opi-Store';
 const SUGGESTIONS_REPO = 'Opi-Store-Suggestions';
-const part1 = 'github_pat_11B3IGRUY0qlPlhAsoQvdg_c5dXYrL22';
-const part2 = 'ECbZRL6xnR8Jif2YtKBevyvhQKDFPxwmj1KI26CWKRhCAmknQU';
+const part1 = 'github_pat_11B3IGRUY0iKK5MyAL4WWK_qJ8RSwipR';
+const part2 = '9hQw2s85CTIWJib3omfFzQU1cGEs8L9iMFAS7PBSPOVQ5hywsv';
 const token = part1 + part2;
 const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases`;
 const REPO_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
@@ -152,6 +152,15 @@ async function readFile(path) {
   };
 }
 
+async function readPostCreatedAt(folder) {
+  const commits = await githubRequest(`/commits?path=${encodeURIComponent(`${folder}/Submission-Text.txt`)}&per_page=1`);
+  const createdAt = commits[0]?.commit?.author?.date;
+  if (!createdAt || Number.isNaN(Date.parse(createdAt))) {
+    throw new Error(`Creation date is unavailable for ${folder}.`);
+  }
+  return createdAt;
+}
+
 function decodeBase64(value) {
   const binary = atob(value.replace(/\n/g, ''));
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -173,8 +182,15 @@ async function loadPosts() {
         readFile(`${post.folder}/Submission-Text.txt`),
         readFile(`${post.folder}/Chat.txt`)
       ]);
+      let createdAt = null;
+      try {
+        createdAt = await readPostCreatedAt(post.folder);
+      } catch (error) {
+        console.error('Unable to load post creation date.', error);
+      }
       return {
         ...post,
+        createdAt,
         submission: submission.text,
         submissionSha: submission.sha,
         chat: chat.text,
@@ -305,10 +321,25 @@ function openPostFromHash() {
 function renderPosts() {
   const displayType = (type) => type === 'Bug-Report' ? 'Bug Report' :
     type === 'Feature-Request' ? 'Feature Request' : 'Discussion';
+  const formatPostDate = (createdAt) => {
+    if (!createdAt) return 'Date unavailable';
+    const date = new Date(createdAt);
+    const dateParts = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC'
+    }).formatToParts(date);
+    const day = dateParts.find((part) => part.type === 'day').value;
+    const month = dateParts.find((part) => part.type === 'month').value;
+    return `${day}. ${month}`;
+  };
   const card = (post) => `
     <article class="post-card" data-post="${encodeURIComponent(post.folder)}">
       <div class="post-card-top">
-        <span class="post-meta">${displayType(post.type)} · ${post.user}</span>
+        <div class="post-card-meta">
+          <span class="post-meta">${displayType(post.type)} · ${post.user}</span>
+          <time class="post-date"${post.createdAt ? ` datetime="${escapeHtml(post.createdAt)}"` : ''}>${escapeHtml(formatPostDate(post.createdAt))}</time>
+        </div>
         ${post.user === currentUser ? '<button class="delete-card-btn" type="button">Delete post</button>' : ''}
       </div>
       <h3>${escapeHtml(post.title)}</h3>

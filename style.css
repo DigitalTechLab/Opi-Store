@@ -554,10 +554,12 @@ body.fullscreen-active .simulator-header {
 
 .post-card:hover { transform: translateY(-3px); border-color: rgba(99, 102, 241, .6); box-shadow: 0 12px 28px rgba(0, 0, 0, .25); }
 .post-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.post-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .post-card h3 { color: #fff; margin: 10px 0 8px; font-size: 1.05rem; }
 .post-card p { color: var(--text-muted); line-height: 1.55; font-size: .92rem; }
 .post-card-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
 .post-meta { color: var(--accent-color); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.post-date { color: var(--text-muted); font-size: .78rem; }
 .posts-status { color: var(--text-muted); grid-column: 1 / -1; }
 .share-card-btn {
   width: 36px;
