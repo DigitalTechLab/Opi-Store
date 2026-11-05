@@ -1,8 +1,8 @@
 const REPO_OWNER = 'DigitalTechLab';
 const REPO_NAME = 'Opi-Store';
 const SUGGESTIONS_REPO = 'Opi-Store-Suggestions';
-const part1 = 'github_pat_11B3IGRUY0iKK5MyAL4WWK_qJ8RSwipR';
-const part2 = '9hQw2s85CTIWJib3omfFzQU1cGEs8L9iMFAS7PBSPOVQ5hywsv';
+const part1 = 'github_pat_11B3IGRUY0pYIHwe54r7gA_OsBH8P3n6z';
+const part2 = '2GUF5KO727SwDmrw1Kaj2AAyASLGfdcsDXNGUANQNW0ORHTkC';
 const token = part1 + part2;
 const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases`;
 const REPO_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
