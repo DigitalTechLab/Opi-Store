@@ -338,9 +338,11 @@ function renderPosts() {
       <div class="post-card-top">
         <div class="post-card-meta">
           <span class="post-meta">${displayType(post.type)} · ${post.user}</span>
-          <time class="post-date"${post.createdAt ? ` datetime="${escapeHtml(post.createdAt)}"` : ''}>${escapeHtml(formatPostDate(post.createdAt))}</time>
         </div>
-        ${post.user === currentUser ? '<button class="delete-card-btn" type="button">Delete post</button>' : ''}
+        <div class="post-card-actions">
+          <time class="post-date"${post.createdAt ? ` datetime="${escapeHtml(post.createdAt)}"` : ''}>${escapeHtml(formatPostDate(post.createdAt))}</time>
+          ${post.user === currentUser ? '<button class="delete-card-btn" type="button">Delete post</button>' : ''}
+        </div>
       </div>
       <h3>${escapeHtml(post.title)}</h3>
       <p>${escapeHtml(post.submission).slice(0, 180)}${post.submission.length > 180 ? '…' : ''}</p>
