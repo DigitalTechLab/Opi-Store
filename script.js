@@ -561,24 +561,50 @@ appImage.addEventListener('load', () => {
 
 appImage.addEventListener('click', (event) => {
   const rect = appImage.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * 100;
-  const y = ((event.clientY - rect.top) / rect.height) * 100;
+  const x = ((event.clientX - rect.left) / rect.width) * appImage.naturalWidth;
+  const y = ((event.clientY - rect.top) / rect.height) * appImage.naturalHeight;
   const currentSrc = appImage.src;
+
+  const isInArea = (x1, y1, x2, y2) => (
+    x >= Math.min(x1, x2) && x <= Math.max(x1, x2)
+    && y >= Math.min(y1, y2) && y <= Math.max(y1, y2)
+  );
+
   if (currentSrc.includes('Photo1')) {
-    if (x >= 25 && x <= 75 && y >= 60 && y <= 90) window.changeAppScreen('Photos/Photo3.jpg');
+    const xPercent = (x / appImage.naturalWidth) * 100;
+    const yPercent = (y / appImage.naturalHeight) * 100;
+    if (xPercent >= 25 && xPercent <= 75 && yPercent >= 60 && yPercent <= 90) {
+      window.changeAppScreen('Photos/Photo3.jpg');
+    }
     return;
   }
-  if (y >= 80 && y <= 100) {
-    if (x <= 25) window.changeAppScreen('Photos/Photo3.jpg');
-    else if (x <= 50) window.changeAppScreen('Photos/Photo4.jpg');
-    else if (x <= 75) window.changeAppScreen('Photos/Photo2.jpg');
-    else window.changeAppScreen('Photos/Photo5.jpg');
+
+  if (isInArea(88, 2029, 286, 2156)) {
+    window.changeAppScreen('Photos/Photo3.jpg');
     return;
   }
-  if (currentSrc.includes('Photo2') && x >= 50 && x <= 94 && y >= 5 && y <= 12) window.changeAppScreen('Photos/Photo6.jpg');
-  if (currentSrc.includes('Photo4') && x >= 75 && x <= 96 && y >= 6 && y <= 12) window.changeAppScreen('Photos/Photo7.jpg');
-  if (currentSrc.includes('Photo6') && x >= 6 && x <= 50 && y >= 5 && y <= 12) window.changeAppScreen('Photos/Photo2.jpg');
-  if (currentSrc.includes('Photo7') && x >= 54 && x <= 74 && y >= 6 && y <= 12) window.changeAppScreen('Photos/Photo4.jpg');
+  if (isInArea(325, 2024, 523, 2151)) {
+    window.changeAppScreen('Photos/Photo4.jpg');
+    return;
+  }
+  if (isInArea(569, 2170, 751, 2018)) {
+    window.changeAppScreen('Photos/Photo2.jpg');
+    return;
+  }
+  if (isInArea(789, 2172, 996, 2024)) {
+    window.changeAppScreen('Photos/Photo5.jpg');
+    return;
+  }
+
+  if (currentSrc.includes('Photo2') && isInArea(548, 127, 976, 252)) {
+    window.changeAppScreen('Photos/Photo6.jpg');
+  } else if (currentSrc.includes('Photo4') && isInArea(846, 156, 1002, 248)) {
+    window.changeAppScreen('Photos/ Photo7.jpg');
+  } else if (currentSrc.includes('Photo6') && isInArea(95, 126, 528, 252)) {
+    window.changeAppScreen('Photos/Photo2.jpg');
+  } else if (currentSrc.includes('Photo7') && isInArea(604, 153, 801, 255)) {
+    window.changeAppScreen('Photos/Photo4.jpg');
+  }
 });
 
 function toggleFullscreen() {
