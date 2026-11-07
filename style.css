@@ -349,6 +349,38 @@ body.fullscreen-active .simulator-header {
   container-type: inline-size;
 }
 
+.photo3-transition {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: none;
+  pointer-events: none;
+}
+
+.photo3-transition.active {
+  display: block;
+}
+
+.photo3-transition-mask {
+  position: absolute;
+  left: 8.148%;
+  top: 14.24%;
+  width: 18.611%;
+  height: 3.129%;
+  background: #141118;
+}
+
+.photo3-transition-title {
+  position: absolute;
+  left: 8.52%;
+  top: 14.78%;
+  color: #d0cbd2;
+  font-size: 4cqw;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .preview-version-tag {
   position: absolute;
   z-index: 5;

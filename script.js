@@ -19,6 +19,8 @@ const fileSize = $('file-size');
 const totalDownloadsTag = $('total-downloads');
 const appImage = $('app-preview-image');
 const previewVersionTag = $('preview-version-tag');
+const photo3Transition = $('photo3-transition');
+const photo3TransitionTitle = $('photo3-transition-title');
 const starsOverlay = $('stars-overlay');
 const starsCount = $('stars-count');
 const startHint = $('start-hint');
@@ -547,8 +549,31 @@ window.changeAppScreen = function changeAppScreen(newSrc) {
   }, 50);
 };
 
+let photo3TypingInterval;
+
+function startPhoto3Transition() {
+  if (photo3Transition.classList.contains('active')) return;
+
+  const title = 'Opi-Store';
+  let typedCharacters = 0;
+  photo3TransitionTitle.textContent = '';
+  photo3Transition.classList.add('active');
+
+  photo3TypingInterval = setInterval(() => {
+    typedCharacters += 1;
+    photo3TransitionTitle.textContent = title.slice(0, typedCharacters);
+
+    if (typedCharacters === title.length) {
+      clearInterval(photo3TypingInterval);
+      photo3TypingInterval = undefined;
+      window.changeAppScreen('Photos/Photo8.jpg');
+    }
+  }, 180);
+}
+
 appImage.addEventListener('load', () => {
   appImage.style.opacity = '1';
+  if (appImage.src.includes('Photo8')) photo3Transition.classList.remove('active');
   previewVersionTag.classList.toggle('active', appImage.src.includes('Photo1') && Boolean(previewVersionTag.textContent));
   if (appImage.src.includes('Photo2')) {
     starsOverlay.classList.add('active');
@@ -560,6 +585,8 @@ appImage.addEventListener('load', () => {
 });
 
 appImage.addEventListener('click', (event) => {
+  if (photo3Transition.classList.contains('active')) return;
+
   const rect = appImage.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * appImage.naturalWidth;
   const y = ((event.clientY - rect.top) / rect.height) * appImage.naturalHeight;
@@ -569,6 +596,11 @@ appImage.addEventListener('click', (event) => {
     x >= Math.min(x1, x2) && x <= Math.max(x1, x2)
     && y >= Math.min(y1, y2) && y <= Math.max(y1, y2)
   );
+
+  if (currentSrc.includes('Photo3') && isInArea(48, 270, 1029, 421)) {
+    startPhoto3Transition();
+    return;
+  }
 
   if (currentSrc.includes('Photo1')) {
     const xPercent = (x / appImage.naturalWidth) * 100;
