@@ -887,7 +887,7 @@ body.fullscreen-active .about-section {
 .aads-banner {
   position: fixed;
   left: 50%;
-  bottom: max(12px, env(safe-area-inset-bottom));
+  bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 99998;
   width: min(calc(100% - 24px), 728px);
   padding: 8px 8px 4px;
@@ -944,7 +944,6 @@ body.fullscreen-active .about-section {
 
 @media (max-width: 600px) {
   .aads-banner {
-    bottom: max(8px, env(safe-area-inset-bottom));
     width: calc(100% - 16px);
     padding: 6px 5px 3px;
   }
